@@ -22,7 +22,7 @@ public:
         uint8_t N : 1;
 
         auto conv() const -> uint8_t {
-            return C | Z << 1 | I << 2 | D << 3 | B << 5 | V << 6 | N << 7;
+            return C | Z << 1 | I << 2 | D << 3 | B << 4 | V << 6 | N << 7;
         }
 
         auto set(uint8_t value) -> void {
