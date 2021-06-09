@@ -385,6 +385,25 @@ cycles instructions::SBC(Cpu& cpu){
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(Mode) && data.second ? cyc + 1 : cyc;
 }
 
+
+template<AddressingMode Mode, Register::Enum Reg>
+cycles instructions::STORE_REG(Cpu& cpu){
+    constexpr cycles cyc = get_cycles<Mode>({ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y}, {3,4,4,5,5,6,6});
+    auto data = load_addr_ref<Mode, NORMAL_MODE>(cpu);
+    switch (Reg){
+        case Register::A:
+            cpu.memory.set(data.first, cpu.A);
+            break;
+        case Register::X:
+            cpu.memory.set(data.first, cpu.X);
+            break;
+        case Register::Y:
+            cpu.memory.set(data.first, cpu.Y);
+            break;
+    }
+    return cyc;
+}
+
 InstructionTable::InstructionTable(){
     using namespace instructions;
     auto time_begin = std::chrono::steady_clock::now();
@@ -561,7 +580,22 @@ InstructionTable::InstructionTable(){
     /// SEI (Set Interrupt Disable)
     create_instructions({0x78}, {FLAGSET<INTERRUPT_DISABLE_FLAG, true>}, "SEI");
 
+    /// STA (Store Accumulator)
+    create_instructions({0x85, 0x95, 0x8D, 0x9D, 0x99, 0x81, 0x91},
+                        {STORE_REG<ZERO_PAGE, Register::A>, STORE_REG<ZERO_PAGE_XY, Register::A>, STORE_REG<ABSOLUTE, Register::A>,
+                        STORE_REG<ABSOLUTE_X, Register::A>, STORE_REG<ABSOLUTE_Y, Register::A>, STORE_REG<INDIRECT_X, Register::A>,
+                        STORE_REG<INDIRECT_Y, Register::A>},
+                        "STA");
 
+    /// STX (Store X Register)
+    create_instructions({0x86, 0x96, 0x8E},
+                        {STORE_REG<ZERO_PAGE, Register::X>, STORE_REG<ZERO_PAGE_XY, Register::X>, STORE_REG<ABSOLUTE, Register::X>},
+                        "STX");
+
+    /// STY (Store Y Register)
+    create_instructions({0x84, 0x94, 0x8C},
+                        {STORE_REG<ZERO_PAGE, Register::Y>, STORE_REG<ZERO_PAGE_XY, Register::Y>, STORE_REG<ABSOLUTE, Register::Y>},
+                        "STY");
 
     auto time_end = std::chrono::steady_clock::now();
     std::cout << "InstructionTable Initialization Completed in " << std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count() << " microseconds.\n";

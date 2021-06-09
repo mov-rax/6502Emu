@@ -46,6 +46,14 @@ namespace Bitshift{
     };
 }
 
+namespace Register{
+    enum Enum {
+        A,
+        X,
+        Y
+    };
+}
+
 struct Instruction;
 struct InstructionTable;
 

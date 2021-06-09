@@ -275,6 +275,8 @@ namespace instructions{
         template<AddressingMode Mode>
         cycles SBC(Cpu& cpu);
 
+        template<AddressingMode Mode, Register::Enum Reg>
+        cycles STORE_REG(Cpu& cpu);
 }
 
 
