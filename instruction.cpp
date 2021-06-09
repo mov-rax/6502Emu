@@ -2,32 +2,61 @@
 #include <chrono>
 #include <iostream>
 #include <bit>
+#include <concepts>
 
 
 using namespace addressing;
 using namespace utils;
 
-template<AddressingMode mode>
-cycles instructions::TEST(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<2, mode>({INDIRECT_X, IMMEDIATE}, {3, 2});
-    constexpr bool is_mode = contains_modes<IMMEDIATE, INDIRECT_X, ZERO_PAGE>(mode);
-    return contains_modes<IMMEDIATE, INDIRECT_X, ZERO_PAGE>(mode) ? cyc + 1 : cyc;
+/// BEGIN LOCAL FUNCTIONS FOR INTEGER/BCD CONVERSION
+uint8_t conv_to_bcd(uint8_t n) {
+    uint64_t bcd = n;
+    for (int i = 0; i < 32; ++i) {
+        for (int j = 0; j < 32; j += 4) {
+            if (((bcd >> (32 + j)) & 0x0000000F) > 4) {
+                bcd += ((uint64_t)3 << (32 + j));
+            }
+        }
+        bcd <<= 1;
+    }
+    bcd >>= 32;
+    return (uint8_t)bcd;
 }
+
+/// Converts a binary-coded decimal to an integer.
+uint8_t conv_to_int(uint8_t bcd_data){
+    return (((bcd_data & 0b11110000) >> 4) * 10) + (bcd_data & 0b00001111);
+}
+
+/// END LOCAL FUNCTIONS FOR INTEGER/BCD CONVERSION
+
 
 /// ADC (Add with carry)
 template<AddressingMode mode>
 cycles instructions::ADC(Cpu& cpu){
     constexpr cycles cyc = get_cycles<mode, 8>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},{2,3,4,4,4,4,6,5});
     auto data = load_addr<mode, NORMAL_MODE>(cpu);
-    uint16_t temp = cpu.A;
-    temp += data.first;
-    if (temp & 0x0100) { // set both overflow and carry
-        cpu.PS.V = 1;
-        cpu.PS.C = 1;
+    uint8_t number;
+    uint16_t result;
+    if (cpu.PS.D){ // BCD
+        number = conv_to_int(data.first);
+        result = (uint16_t)cpu.A + number + cpu.PS.C;
+        if (result & 0x0080){
+            cpu.A = conv_to_bcd((~result + 1) % 100); // 2's complement
+        } else {
+            cpu.A = conv_to_bcd(result % 100);
+        }
+    } else { // Normal
+        number = data.first;
+        result = (uint16_t)cpu.A + number + cpu.PS.C;
+        cpu.A = result;
     }
-    if (temp & 0x0080) cpu.PS.N = 1;
-    if (!(temp & 0x00FF)) cpu.PS.Z = 1;
-    cpu.A = temp;
+
+    if (result & 0x0100) cpu.PS.C = 1;
+    if (!cpu.A) cpu.PS.Z = 1;
+    if (cpu.A ^ (cpu.PS.N << 7)) cpu.PS.V = 1;
+    if (cpu.A & 0x80) cpu.PS.N = 1;
+
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(mode) && data.second ? cyc + 1 : cyc;
 }
 
@@ -305,8 +334,55 @@ cycles instructions::PULL_REG(Cpu& cpu){
     } else {
         cpu.PS.set(result);
     }
-
     return cyc;
+}
+
+/// RTI (Return from Interrupt)
+cycles instructions::RTI(Cpu& cpu){
+    constexpr cycles cyc = 6; // IMPLIED
+    cpu.PS.set(cpu.pop());
+    cpu.PC = cpu.pop() | (cpu.pop() << 8);
+    return cyc;
+}
+
+/// RTS (Return from Subroutine)
+cycles instructions::RTS(Cpu& cpu){
+    constexpr cycles cyc = 6; // IMPLIED
+    cpu.PC = cpu.pop() | (cpu.pop() << 8);
+    cpu.PC += 1;
+    return cyc;
+}
+
+/// SBC (Subtract with Carry)
+template<AddressingMode Mode>
+cycles instructions::SBC(Cpu& cpu){
+    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
+                                            {2,3,4,4,4,4,6,5});
+    auto data = load_addr<Mode, NORMAL_MODE>(cpu);
+    uint8_t number;
+    uint16_t result;
+    if (cpu.PS.D){ // BCD
+        number = ~conv_to_int(data.first) + 1; // 2's complement
+        result = (uint16_t)cpu.A + number - !cpu.PS.C;
+        if (result & 0x0080) {
+            cpu.A = conv_to_bcd((~result + 1) % 100);
+            cpu.PS.C = 0;
+        } else {
+            cpu.A = conv_to_bcd(result % 100); // 0100 -> 1011 + 1 -> 1100
+        }
+    } else { // Normal
+        number = ~data.first + 1; // 2's complement
+        result = (uint16_t)cpu.A + number - !cpu.PS.C;
+        cpu.A = result;
+    }
+    if (!cpu.A)
+        cpu.PS.Z = 1;
+    else
+        cpu.PS.Z = 0;
+
+    if (cpu.A ^ (cpu.PS.N << 7)) cpu.PS.V = 1;
+    if (cpu.A & 0x80) cpu.PS.N = 1;
+    return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(Mode) && data.second ? cyc + 1 : cyc;
 }
 
 InstructionTable::InstructionTable(){
@@ -464,6 +540,28 @@ InstructionTable::InstructionTable(){
                         {BITSHIFT<ACCUMULATOR, Bitshift::ROTATE_RIGHT>, BITSHIFT<ZERO_PAGE, Bitshift::ROTATE_RIGHT>, BITSHIFT<ZERO_PAGE_XY, Bitshift::ROTATE_RIGHT>,
                          BITSHIFT<ABSOLUTE, Bitshift::ROTATE_RIGHT>, BITSHIFT<ABSOLUTE_X, Bitshift::ROTATE_RIGHT>},
                          "ROR");
+
+    /// RTI (Return from Interrupt)
+    create_instructions({0x40}, {RTI}, "RTI");
+
+    /// RTS (Return from Subroutine)
+    create_instructions({0x60}, {RTS}, "RTS");
+
+    // SBC (Subtract with Carry)
+    create_instructions({0x69, 0x65, 0x75, 0x6D, 0x7D, 0x79, 0x61, 0x71},
+                        {SBC<IMMEDIATE>, SBC<ZERO_PAGE>, SBC<ZERO_PAGE_XY>, SBC<ABSOLUTE>, SBC<ABSOLUTE_X>, SBC<ABSOLUTE_Y>, SBC<INDIRECT_X>, SBC<INDIRECT_Y>},
+                        "SBC");
+
+    /// SEC (Set Carry Flag)
+    create_instructions({0x38}, {FLAGSET<CARRY_FLAG, true>}, "SEC");
+
+    /// SED (Set Decimal Flag)
+    create_instructions({0xF8}, {FLAGSET<DECIMAL_FLAG, true>}, "SED");
+
+    /// SEI (Set Interrupt Disable)
+    create_instructions({0x78}, {FLAGSET<INTERRUPT_DISABLE_FLAG, true>}, "SEI");
+
+
 
     auto time_end = std::chrono::steady_clock::now();
     std::cout << "InstructionTable Initialization Completed in " << std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count() << " microseconds.\n";

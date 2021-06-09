@@ -265,13 +265,16 @@ namespace instructions{
         template<bool IsAcc>
         cycles PULL_REG(Cpu& cpu);
 
-        template<AddressingMode mode>
-        cycles TEST(Cpu &cpu);
-
         template<AddressingMode Mode>
         cycles EOR(Cpu& cpu);
 
-    
+        cycles RTI(Cpu& cpu);
+
+        cycles RTS(Cpu& cpu);
+
+        template<AddressingMode Mode>
+        cycles SBC(Cpu& cpu);
+
 }
 
 
