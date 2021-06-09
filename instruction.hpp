@@ -208,78 +208,78 @@ namespace instructions{
     }
 
         template<AddressingMode Mode>
-        cycles ADC(Cpu& cpu);
+        static cycles ADC(Cpu& cpu);
 
         template<AddressingMode Mode>
-        cycles AND(Cpu& cpu);
+        static cycles AND(Cpu& cpu);
 
         template<AddressingMode Mode>
-        cycles ASL(Cpu& cpu);
+        static cycles ASL(Cpu& cpu);
 
         template<PSFlagType Flag, bool IsSet>
-        cycles BRANCH(Cpu& cpu);
+        static cycles BRANCH(Cpu& cpu);
 
         template<AddressingMode Mode>
-        cycles BIT(Cpu &cpu);
+        static cycles BIT(Cpu &cpu);
 
-        cycles BRK(Cpu &cpu);
+        static cycles BRK(Cpu &cpu);
 
         template<PSFlagType Flag, bool Value>
-        cycles FLAGSET(Cpu& cpu);
+        static cycles FLAGSET(Cpu& cpu);
 
         template<AddressingMode Mode>
-        cycles CMP(Cpu& cpu);
+        static cycles CMP(Cpu& cpu);
 
         template<AddressingMode Mode, bool IsX>
-        cycles CMP_REG(Cpu& cpu);
+        static cycles CMP_REG(Cpu& cpu);
 
         template<AddressingMode Mode, bool IsIncrement>
-        cycles INCDEC_MEMORY(Cpu& cpu);
+        static cycles INCDEC_MEMORY(Cpu& cpu);
 
         template<bool IsX, bool IsIncrement>
-        cycles INCDEC_REG(Cpu& cpu);
+        static cycles INCDEC_REG(Cpu& cpu);
 
         template<AddressingMode Mode>
-        cycles JMP(Cpu& cpu);
+        static cycles JMP(Cpu& cpu);
 
         template<AddressingMode Mode>
-        cycles JSR(Cpu& cpu);
+        static cycles JSR(Cpu& cpu);
 
         template<AddressingMode Mode>
-        cycles LDA(Cpu& cpu);
+        static cycles LDA(Cpu& cpu);
 
         template<AddressingMode Mode, bool isX>
-        cycles LOAD_REG(Cpu& cpu);
+        static cycles LOAD_REG(Cpu& cpu);
 
         template<AddressingMode Mode, Bitshift::Enum ShiftType>
-        cycles BITSHIFT(Cpu& cpu);
+        static cycles BITSHIFT(Cpu& cpu);
 
-        cycles NOP(Cpu& cpu);
+        static cycles NOP(Cpu& cpu);
 
         template<AddressingMode Mode>
-        cycles ORA(Cpu& cpu);
+        static cycles ORA(Cpu& cpu);
 
         template<bool IsAcc>
-        cycles PUSH_REG(Cpu& cpu);
+        static cycles PUSH_REG(Cpu& cpu);
 
         template<bool IsAcc>
-        cycles PULL_REG(Cpu& cpu);
+        static cycles PULL_REG(Cpu& cpu);
 
         template<AddressingMode Mode>
-        cycles EOR(Cpu& cpu);
+        static cycles EOR(Cpu& cpu);
 
-        cycles RTI(Cpu& cpu);
+        static cycles RTI(Cpu& cpu);
 
-        cycles RTS(Cpu& cpu);
+        static cycles RTS(Cpu& cpu);
 
         template<AddressingMode Mode>
-        cycles SBC(Cpu& cpu);
+        static cycles SBC(Cpu& cpu);
 
         template<AddressingMode Mode, Register::Enum Reg>
-        cycles STORE_REG(Cpu& cpu);
+        static cycles STORE_REG(Cpu& cpu);
 
         template<Register::Enum FromReg, Register::Enum ToReg>
-        cycles TRANSFER_REG(Cpu& cpu);
+        static cycles TRANSFER_REG(Cpu& cpu);
 }
 
 

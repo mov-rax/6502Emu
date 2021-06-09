@@ -33,7 +33,7 @@ uint8_t conv_to_int(uint8_t bcd_data){
 
 /// ADC (Add with carry)
 template<AddressingMode mode>
-cycles instructions::ADC(Cpu& cpu){
+static cycles instructions::ADC(Cpu& cpu){
     constexpr cycles cyc = get_cycles<mode, 8>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},{2,3,4,4,4,4,6,5});
     auto data = load_addr<mode, NORMAL_MODE>(cpu);
     uint8_t number;
@@ -62,7 +62,7 @@ cycles instructions::ADC(Cpu& cpu){
 
 /// AND (logical AND)
 template<AddressingMode Mode>
-cycles instructions::AND(Cpu& cpu){
+static cycles instructions::AND(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y}, {2, 3, 4, 4, 4, 4, 6, 5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     cpu.A &= data.first;
@@ -73,7 +73,7 @@ cycles instructions::AND(Cpu& cpu){
 
 /// ASL (Arithmetic Shift Left)
 template<AddressingMode Mode>
-cycles instructions::ASL(Cpu& cpu){
+static cycles instructions::ASL(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({ACCUMULATOR, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X}, {2, 5, 6, 6, 7});
     std::pair<uint16_t, bool> data;
     uint16_t tmp;
@@ -93,7 +93,7 @@ cycles instructions::ASL(Cpu& cpu){
 
 /// BRANCH (Generic function for all relative branching in the 6502)
 template<PSFlagType Flag, bool IsSet>
-cycles instructions::BRANCH(Cpu& cpu){
+static cycles instructions::BRANCH(Cpu& cpu){
     uint16_t branch_location = cpu.PC + (int16_t)cpu.memory.get(cpu.PC++);
     if (is_flag<Flag, IsSet>(cpu)){
         cpu.PC = branch_location;
@@ -107,7 +107,7 @@ cycles instructions::BRANCH(Cpu& cpu){
 
 /// BIT (Bit Test)
 template<AddressingMode Mode>
-cycles instructions::BIT(Cpu &cpu){
+static cycles instructions::BIT(Cpu &cpu){
     constexpr cycles cyc = get_cycles<Mode>({ZERO_PAGE, ABSOLUTE}, {3, 4});
     std::pair<uint16_t, bool> data = load_addr<Mode, NORMAL_MODE>(cpu);
     uint8_t value = cpu.A & data.first;
@@ -119,7 +119,7 @@ cycles instructions::BIT(Cpu &cpu){
 }
 
 /// BRK (Force Interrupt)
-cycles instructions::BRK(Cpu &cpu){
+static cycles instructions::BRK(Cpu &cpu){
     constexpr cycles cyc = 7;
     cpu.PC++; // has an extra padding byte.
     cpu.PS.B = 0b11;
@@ -132,7 +132,7 @@ cycles instructions::BRK(Cpu &cpu){
 }
 
 template<PSFlagType Flag, bool Value>
-cycles instructions::FLAGSET(Cpu& cpu){
+static cycles instructions::FLAGSET(Cpu& cpu){
     constexpr cycles cyc = 2;
     cpu.PC++;
     set_flag<Flag,Value>(cpu);
@@ -140,7 +140,7 @@ cycles instructions::FLAGSET(Cpu& cpu){
 }
 
 template<AddressingMode Mode>
-cycles instructions::CMP(Cpu& cpu){
+static cycles instructions::CMP(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
@@ -151,7 +151,7 @@ cycles instructions::CMP(Cpu& cpu){
 }
 
 template<AddressingMode Mode, bool IsX>
-cycles instructions::CMP_REG(Cpu& cpu){
+static cycles instructions::CMP_REG(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ABSOLUTE}, {2,3,4});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     if (IsX){ // X Register
@@ -166,7 +166,7 @@ cycles instructions::CMP_REG(Cpu& cpu){
 }
 
 template<AddressingMode Mode, bool IsIncrement>
-cycles instructions::INCDEC_MEMORY(Cpu& cpu){
+static cycles instructions::INCDEC_MEMORY(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X}, {5,6,6,7});
     auto data = load_addr_ref<Mode, NORMAL_MODE>(cpu);
     uint8_t result = IsIncrement ?  cpu.memory.get(data.first)+1 : cpu.memory.get(data.first)-1;
@@ -177,7 +177,7 @@ cycles instructions::INCDEC_MEMORY(Cpu& cpu){
 }
 
 template<bool IsX, bool IsIncrement>
-cycles instructions::INCDEC_REG(Cpu& cpu){
+static cycles instructions::INCDEC_REG(Cpu& cpu){
     constexpr cycles cyc = 2;
     uint8_t result;
     if (IsX)
@@ -191,7 +191,7 @@ cycles instructions::INCDEC_REG(Cpu& cpu){
 
 /// EOR (Exclusive OR)
 template<AddressingMode Mode>
-cycles instructions::EOR(Cpu& cpu){
+static cycles instructions::EOR(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
@@ -203,7 +203,7 @@ cycles instructions::EOR(Cpu& cpu){
 
 /// JMP (Jump)
 template<AddressingMode Mode>
-cycles instructions::JMP(Cpu& cpu){
+static cycles instructions::JMP(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({ABSOLUTE, INDIRECT}, {3,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     cpu.PC = data.first;
@@ -212,7 +212,7 @@ cycles instructions::JMP(Cpu& cpu){
 
 /// JSR (Jump to Subroutine)
 template<AddressingMode Mode>
-cycles instructions::JSR(Cpu& cpu){
+static cycles instructions::JSR(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({ABSOLUTE}, {6}); // Done to ensure only ABSOLUTE is used in this instruction
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     cpu.push(cpu.PC >> 8);
@@ -222,7 +222,7 @@ cycles instructions::JSR(Cpu& cpu){
 }
 
 template<AddressingMode Mode>
-cycles instructions::LDA(Cpu& cpu){
+static cycles instructions::LDA(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
@@ -233,7 +233,7 @@ cycles instructions::LDA(Cpu& cpu){
 }
 
 template<AddressingMode Mode, bool IsX>
-cycles instructions::LOAD_REG(Cpu& cpu){
+static cycles instructions::LOAD_REG(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y}, {2,3,4,4,4,4});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     uint8_t result;
@@ -248,7 +248,7 @@ cycles instructions::LOAD_REG(Cpu& cpu){
 }
 
 template<AddressingMode Mode, Bitshift::Enum ShiftType>
-cycles instructions::BITSHIFT(Cpu& cpu){
+static cycles instructions::BITSHIFT(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({ACCUMULATOR, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X}, {2,5,6,6,7});
     if (contains_modes<ACCUMULATOR>(Mode)){
         switch (ShiftType){
@@ -294,7 +294,7 @@ cycles instructions::BITSHIFT(Cpu& cpu){
 }
 
 /// NOP (No Operation)
-cycles instructions::NOP(Cpu& cpu){
+static cycles instructions::NOP(Cpu& cpu){
     constexpr cycles cyc = 2; // IMPLIED
     cpu.PC++;
     return cyc;
@@ -302,7 +302,7 @@ cycles instructions::NOP(Cpu& cpu){
 
 /// ORA (Logical Inclusive OR)
 template<AddressingMode Mode>
-cycles instructions::ORA(Cpu& cpu){
+static cycles instructions::ORA(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
@@ -313,7 +313,7 @@ cycles instructions::ORA(Cpu& cpu){
 }
 
 template<bool IsAcc>
-cycles instructions::PUSH_REG(Cpu& cpu){
+static cycles instructions::PUSH_REG(Cpu& cpu){
     constexpr cycles cyc = 3; // IMPLIED
     if (IsAcc)
         cpu.push(cpu.A);
@@ -324,7 +324,7 @@ cycles instructions::PUSH_REG(Cpu& cpu){
 
 
 template<bool IsAcc>
-cycles instructions::PULL_REG(Cpu& cpu){
+static cycles instructions::PULL_REG(Cpu& cpu){
     constexpr cycles cyc = 4; // IMPLIED
     uint8_t result = cpu.pop();
     if (IsAcc){
@@ -338,7 +338,7 @@ cycles instructions::PULL_REG(Cpu& cpu){
 }
 
 /// RTI (Return from Interrupt)
-cycles instructions::RTI(Cpu& cpu){
+static cycles instructions::RTI(Cpu& cpu){
     constexpr cycles cyc = 6; // IMPLIED
     cpu.PS.set(cpu.pop());
     cpu.PC = cpu.pop() | (cpu.pop() << 8);
@@ -346,7 +346,7 @@ cycles instructions::RTI(Cpu& cpu){
 }
 
 /// RTS (Return from Subroutine)
-cycles instructions::RTS(Cpu& cpu){
+static cycles instructions::RTS(Cpu& cpu){
     constexpr cycles cyc = 6; // IMPLIED
     cpu.PC = cpu.pop() | (cpu.pop() << 8);
     cpu.PC += 1;
@@ -355,7 +355,7 @@ cycles instructions::RTS(Cpu& cpu){
 
 /// SBC (Subtract with Carry)
 template<AddressingMode Mode>
-cycles instructions::SBC(Cpu& cpu){
+static cycles instructions::SBC(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
@@ -387,7 +387,7 @@ cycles instructions::SBC(Cpu& cpu){
 
 
 template<AddressingMode Mode, Register::Enum Reg>
-cycles instructions::STORE_REG(Cpu& cpu){
+static cycles instructions::STORE_REG(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y}, {3,4,4,5,5,6,6});
     auto data = load_addr_ref<Mode, NORMAL_MODE>(cpu);
     switch (Reg){
@@ -407,7 +407,7 @@ cycles instructions::STORE_REG(Cpu& cpu){
 }
 
 template<Register::Enum FromReg, Register::Enum ToReg>
-cycles instructions::TRANSFER_REG(Cpu& cpu){
+static cycles instructions::TRANSFER_REG(Cpu& cpu){
     static const char error_words[] = "Invalid Register type in TRANSFER_REF template parameter `ToReg`.";
     constexpr cycles cyc = 2;
     switch (FromReg) {
