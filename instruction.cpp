@@ -400,6 +400,63 @@ cycles instructions::STORE_REG(Cpu& cpu){
         case Register::Y:
             cpu.memory.set(data.first, cpu.Y);
             break;
+        default:
+            throw std::runtime_error("Invalid Register type in STORE_REG template parameter `Reg`.");
+    }
+    return cyc;
+}
+
+template<Register::Enum FromReg, Register::Enum ToReg>
+cycles instructions::TRANSFER_REG(Cpu& cpu){
+    static const char error_words[] = "Invalid Register type in TRANSFER_REF template parameter `ToReg`.";
+    constexpr cycles cyc = 2;
+    switch (FromReg) {
+        case Register::A:
+            switch (ToReg){
+                case Register::X:
+                    cpu.X = cpu.A;
+                    if (!cpu.X) cpu.PS.Z = 1;
+                    if (cpu.X & 0x80) cpu.PS.N = 1;
+                    break;
+                case Register::Y:
+                    cpu.Y = cpu.A;
+                    if (!cpu.Y) cpu.PS.Z = 1;
+                    if (cpu.Y & 0x80) cpu.PS.N = 1;
+                    break;
+                default:
+                    throw std::runtime_error(error_words);
+            }
+            break;
+        case Register::X:
+            switch (ToReg){
+                case Register::A:
+                    cpu.A = cpu.X;
+                    if (!cpu.A) cpu.PS.Z = 1;
+                    if (cpu.A & 0x80) cpu.PS.N = 1;
+                    break;
+                case Register::SP:
+                    cpu.SP = cpu.X;
+                    break;
+                default:
+                    throw std::runtime_error(error_words);
+            }
+            break;
+        case Register::Y:
+            if (ToReg == Register::A)
+                cpu.A = cpu.Y;
+            else
+                throw std::runtime_error(error_words);
+            if (!cpu.A) cpu.PS.Z = 1;
+            if (cpu.A & 0x80) cpu.PS.N = 1;
+            break;
+        case Register::SP:
+            if (ToReg == Register::X)
+                cpu.X = cpu.SP;
+            else
+                throw std::runtime_error(error_words);
+            if (!cpu.X) cpu.PS.Z = 1;
+            if (cpu.X & 0x80) cpu.PS.N = 1;
+            break;
     }
     return cyc;
 }
@@ -596,6 +653,24 @@ InstructionTable::InstructionTable(){
     create_instructions({0x84, 0x94, 0x8C},
                         {STORE_REG<ZERO_PAGE, Register::Y>, STORE_REG<ZERO_PAGE_XY, Register::Y>, STORE_REG<ABSOLUTE, Register::Y>},
                         "STY");
+
+    /// TAX (Transfer Accumulator to X)
+    create_instructions({0xAA}, {TRANSFER_REG<Register::A, Register::X>}, "TAX");
+
+    /// TAY (Transfer Accumulator to Y)
+    create_instructions({0xA8}, {TRANSFER_REG<Register::A, Register::Y>}, "TAY");
+
+    /// TSX (Transfer Stack Pointer to X)
+    create_instructions({0xBA}, {TRANSFER_REG<Register::SP, Register::X>}, "TSX");
+
+    /// TXA (Transfer X to Accumulator)
+    create_instructions({0x8A}, {TRANSFER_REG<Register::X, Register::A>}, "TXA");
+
+    /// TXS (Transfer X to Stack Pointer)
+    create_instructions({0x9A}, {TRANSFER_REG<Register::X, Register::SP>}, "TXS");
+
+    /// TYA (Transfer Y to Accumulator)
+    create_instructions({0x98}, {TRANSFER_REG<Register::Y, Register::A>}, "TYA");
 
     auto time_end = std::chrono::steady_clock::now();
     std::cout << "InstructionTable Initialization Completed in " << std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count() << " microseconds.\n";

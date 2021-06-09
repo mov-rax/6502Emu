@@ -50,7 +50,8 @@ namespace Register{
     enum Enum {
         A,
         X,
-        Y
+        Y,
+        SP
     };
 }
 

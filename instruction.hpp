@@ -277,6 +277,9 @@ namespace instructions{
 
         template<AddressingMode Mode, Register::Enum Reg>
         cycles STORE_REG(Cpu& cpu);
+
+        template<Register::Enum FromReg, Register::Enum ToReg>
+        cycles TRANSFER_REG(Cpu& cpu);
 }
 
 
