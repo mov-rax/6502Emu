@@ -7,7 +7,7 @@
 
 struct Mem{
     public:
-    static const std::size_t MEM_LEN = 0xFFFF;
+    static const std::size_t MEM_LEN = 0x10000;
     std::array<uint8_t, MEM_LEN> data;
 
     auto get(std::size_t index) const -> uint8_t{

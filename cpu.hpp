@@ -6,6 +6,8 @@
 
 class Cpu{
     using size_t = std::size_t;
+private:
+    static const unsigned int STACK_PTR_BASE = 0x0100; // lowest memory address of the SP, which ranges from 0x0100 - 0x01FF
 public:
     size_t frequency; // Frequency (Hz)
     Mem memory; // Memory (0xFFFF bytes)
@@ -35,18 +37,38 @@ public:
             N = (value >> 7) & 1;
         }
     } PS;
-    //uint8_t N : 1, V : 1, B : 2, D : 1, I : 1, Z : 1, C : 1;
+
+    // REGISTER RESET METHODS.
+
+    virtual void reset_A();
+    virtual void reset_X();
+    virtual void reset_Y();
+    virtual void reset_SP();
+    virtual void reset_PC();
+
+    // PROGRAM STATUS FLAG RESET METHODS.
+
+    virtual void reset_N();
+    virtual void reset_V();
+    virtual void reset_B();
+    virtual void reset_D();
+    virtual void reset_I();
+    virtual void reset_Z();
+    virtual void reset_C();
 
     /// Sets all register values to 0.
-    auto reset_registers() -> void {
-        A = 0; X = 0; Y = 0; SP = 0xFF; PC = 0;
+     auto reset_registers() -> void {
+        reset_A(); reset_X(); reset_Y(); reset_SP(); reset_PC();
     }
-    /// Sets all flags to 0.
+    /// Sets all flags to default values..
     auto reset_flags() -> void {
-        PS.N = 0; PS.V = 0; PS.B = 0; PS.D = 0; PS.I = 0; PS.Z = 0; PS.C = 0;
+         reset_N(); reset_V(); reset_B(); reset_D(); reset_I(); reset_Z(); reset_C();
     }
 
-    auto get_instr(uint16_t opcode) const -> const Instruction&;
+    /// Sends the RESET signal to the 6502
+    auto reset() -> void {
+        PC = memory.get(0xFFFC) | (memory.get(0xFFFD) << 8);
+    }
 
     Cpu(){
         frequency = 1660000; // DEFAULTS TO NES FREQUENCY
@@ -58,8 +80,8 @@ public:
     auto push(uint8_t data) -> void;
     auto pop() -> uint8_t;
 
-    auto execute_instruction();
-    auto get_address() const -> uint16_t;
+    void execute_instruction();
+    void print_debug_info() const;
 };
 
 #endif

@@ -52,9 +52,9 @@ static cycles instructions::ADC(Cpu& cpu){
         cpu.A = result;
     }
 
-    if (result & 0x0100) cpu.PS.C = 1;
+    cpu.PS.C = result & 0x0100;
     if (!cpu.A) cpu.PS.Z = 1;
-    if (cpu.A ^ (cpu.PS.N << 7)) cpu.PS.V = 1;
+    if ((cpu.A & 0x80) ^ (cpu.PS.N << 7)) cpu.PS.V = 1;
     if (cpu.A & 0x80) cpu.PS.N = 1;
 
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(mode) && data.second ? cyc + 1 : cyc;
@@ -96,11 +96,14 @@ template<PSFlagType Flag, bool IsSet>
 static cycles instructions::BRANCH(Cpu& cpu){
     uint16_t branch_location = cpu.PC + (int16_t)cpu.memory.get(cpu.PC++);
     if (is_flag<Flag, IsSet>(cpu)){
-        cpu.PC = branch_location;
-        if ((branch_location & 0xFF00) ^ (cpu.PC & 0xFF00)) // Check if to a new page.
+        if ((branch_location & 0xFF00) ^ (cpu.PC & 0xFF00)){ // Check if to a new page.
+            cpu.PC = branch_location;
             return 4;
-        else
+        }
+        else {
+            cpu.PC = branch_location;
             return 3;
+        }
     }
     return 2;
 }
@@ -134,7 +137,6 @@ static cycles instructions::BRK(Cpu &cpu){
 template<PSFlagType Flag, bool Value>
 static cycles instructions::FLAGSET(Cpu& cpu){
     constexpr cycles cyc = 2;
-    cpu.PC++;
     set_flag<Flag,Value>(cpu);
     return cyc;
 }
@@ -296,7 +298,6 @@ static cycles instructions::BITSHIFT(Cpu& cpu){
 /// NOP (No Operation)
 static cycles instructions::NOP(Cpu& cpu){
     constexpr cycles cyc = 2; // IMPLIED
-    cpu.PC++;
     return cyc;
 }
 
@@ -360,19 +361,19 @@ static cycles instructions::SBC(Cpu& cpu){
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     uint8_t number;
-    uint16_t result;
+    uint8_t result;
     if (cpu.PS.D){ // BCD
         number = ~conv_to_int(data.first) + 1; // 2's complement
-        result = (uint16_t)cpu.A + number - !cpu.PS.C;
+        result = cpu.A + number - !cpu.PS.C;
         if (result & 0x0080) {
             cpu.A = conv_to_bcd((~result + 1) % 100);
             cpu.PS.C = 0;
         } else {
-            cpu.A = conv_to_bcd(result % 100); // 0100 -> 1011 + 1 -> 1100
+            cpu.A = conv_to_bcd(result % 100);
         }
     } else { // Normal
         number = ~data.first + 1; // 2's complement
-        result = (uint16_t)cpu.A + number - !cpu.PS.C;
+        result = cpu.A + number - !cpu.PS.C;
         cpu.A = result;
     }
     if (!cpu.A)
@@ -380,7 +381,7 @@ static cycles instructions::SBC(Cpu& cpu){
     else
         cpu.PS.Z = 0;
 
-    if (cpu.A ^ (cpu.PS.N << 7)) cpu.PS.V = 1;
+    if ((cpu.A & 0x80) ^ (cpu.PS.N << 7)) cpu.PS.V = 1;
     if (cpu.A & 0x80) cpu.PS.N = 1;
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(Mode) && data.second ? cyc + 1 : cyc;
 }
@@ -624,7 +625,7 @@ InstructionTable::InstructionTable(){
     create_instructions({0x60}, {RTS}, "RTS");
 
     // SBC (Subtract with Carry)
-    create_instructions({0x69, 0x65, 0x75, 0x6D, 0x7D, 0x79, 0x61, 0x71},
+    create_instructions({0xE9, 0xE5, 0xF5, 0xED, 0xFD, 0xF9, 0xE1, 0xF1},
                         {SBC<IMMEDIATE>, SBC<ZERO_PAGE>, SBC<ZERO_PAGE_XY>, SBC<ABSOLUTE>, SBC<ABSOLUTE_X>, SBC<ABSOLUTE_Y>, SBC<INDIRECT_X>, SBC<INDIRECT_Y>},
                         "SBC");
 
