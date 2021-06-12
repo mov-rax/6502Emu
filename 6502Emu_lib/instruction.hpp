@@ -126,8 +126,9 @@ namespace addressing{
                 switch (Mode){
                     case INDIRECT_X:
                         temp = (cpu.memory.get(cpu.PC++) + cpu.X) & 0x00FF; // Get zero-page address + X without carry (0x00FF).
-                        if (GetEffectiveAddress) return std::pair(temp, false);
                         temp = cpu.memory.get(temp) | (cpu.memory.get(temp + 1) << 8); // Get address at zero-page address.
+                        if (GetEffectiveAddress) return std::pair(temp, false);
+                        temp = cpu.memory.get(temp);
                         return std::pair(temp, false);
                     case ZERO_PAGE:
                         temp = cpu.memory.get(cpu.PC++);

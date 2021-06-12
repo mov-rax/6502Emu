@@ -91,3 +91,10 @@ void Cpu::print_debug_info() const {
     printf("V: %d\n", PS.V);
     printf("N: %d\n", PS.N);
 }
+
+
+
+
+
+
+

@@ -1,0 +1,2 @@
+add_executable(Catch_tests_run AddressingTests.cpp)
+target_link_libraries(Catch_tests_run 6502Emu_lib)

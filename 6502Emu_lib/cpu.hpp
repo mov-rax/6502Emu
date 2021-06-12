@@ -3,6 +3,7 @@
 #define CPU6502
 #include "types.h"
 #include "mem.hpp"
+#include <array>
 
 class Cpu{
     using size_t = std::size_t;
@@ -82,6 +83,13 @@ public:
 
     void execute_instruction();
     void print_debug_info() const;
+
+    template<size_t N>
+    void program_write(const uint8_t (&data)[N]) {
+        for (int i = 0; i < N; i++){
+            memory.set(PC + i, data[i]);
+        }
+    }
 };
 
 #endif
