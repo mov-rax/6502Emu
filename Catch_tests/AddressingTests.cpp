@@ -59,3 +59,54 @@ TEST_CASE("INDIRECT_Y ADDRESSING", "[AddressingTests]") {
     cpu.execute_instruction(); // LDA ($A4),Y
     REQUIRE(cpu.A == 0x81);
 }
+
+TEST_CASE("ZERO_PAGE_X ADDRESSING", "[AddressingTests]") {
+    Cpu cpu;
+    cpu.memory.set(0x3A, 0x04);
+    cpu.program_write({0xA2, 0xE9, 0xB5, 0x51});
+    cpu.execute_instruction(); // LDX #$E9
+    REQUIRE(cpu.X == 0xE9);
+    cpu.execute_instruction(); // LDA $51,X
+    REQUIRE(cpu.A == 0x04);
+}
+
+TEST_CASE("ABSOLUTE_Y ADDRESSING", "[AddressingTests]") {
+    Cpu cpu;
+    cpu.program_write({0xA2, 0x81, 0xA0, 0xA3, 0x8E, 0x79, 0x22, 0xB9, 0xD6, 0x21});
+    cpu.execute_instruction(); // LDX #$81
+    REQUIRE(cpu.X == 0x81);
+    cpu.execute_instruction(); // LDY #$A3
+    REQUIRE(cpu.Y == 0xA3);
+    cpu.execute_instruction(); // STX $2279
+    REQUIRE(cpu.memory.get(0x2279) == cpu.X);
+    cpu.execute_instruction(); // LDA $21D6, Y
+    REQUIRE(cpu.A == 0x81);
+    // flags
+    REQUIRE(cpu.PS.N == 1);
+}
+
+TEST_CASE("ABSOLUTE_X ADDRESSING", "[AddressingTests]") {
+    Cpu cpu;
+    cpu.program_write({0xA2, 0xA3, 0xA0, 0x81, 0x8C, 0x79, 0x22, 0xBD, 0xD6, 0x21});
+    cpu.execute_instruction(); // LDX #$A3
+    REQUIRE(cpu.X == 0xA3);
+    cpu.execute_instruction(); // LDY #$81
+    REQUIRE(cpu.Y == 0x81);
+    cpu.execute_instruction(); // STY $2279
+    REQUIRE(cpu.memory.get(0x2279) == cpu.Y);
+    cpu.execute_instruction(); // LDA $21D6, X
+    REQUIRE(cpu.A == 0x81);
+    // flags
+    REQUIRE(cpu.PS.N == 1);
+}
+
+TEST_CASE("ACCUMULATOR ADDRESSING", "[AddressingTests]") {
+    Cpu cpu;
+    cpu.program_write({0xA9, 0x01, 0x2A, 0x6A});
+    cpu.execute_instruction(); // LDA #$01
+    REQUIRE(cpu.A == 0x01);
+    cpu.execute_instruction(); // ROL
+    REQUIRE(cpu.A == 0x02);
+    cpu.execute_instruction(); // ROR
+    REQUIRE(cpu.A == 0x01);
+}
