@@ -204,12 +204,11 @@ static cycles instructions::EOR(Cpu& cpu){
 }
 
 /// JMP (Jump)
-template<AddressingMode Mode>
+template<AddressingMode AMode, ModeType MMode>
 static cycles instructions::JMP(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<Mode>({ABSOLUTE, INDIRECT}, {3,5});
-    auto data = load_addr<Mode, NORMAL_MODE>(cpu);
+    auto data = load_addr<AMode, MMode>(cpu);
     cpu.PC = data.first;
-    return cyc;
+    return (MMode == NORMAL_MODE) ? 3 : 5;
 }
 
 /// JSR (Jump to Subroutine)
@@ -560,7 +559,7 @@ InstructionTable::InstructionTable(){
     create_instructions({0xC8}, {INCDEC_REG<false, true>}, "INY");
 
     /// JMP (Jump)
-    create_instructions({0x4C, 0x6C}, {JMP<ABSOLUTE>, JMP<INDIRECT>}, "JMP");
+    create_instructions({0x4C, 0x6C}, {JMP<ABSOLUTE, NORMAL_MODE>, JMP<INDIRECT, ALTERNATIVE_MODE>}, "JMP");
 
     /// JSR (Jump to Subroutine)
     create_instructions({0x20}, {JSR<ABSOLUTE>}, "JSR");

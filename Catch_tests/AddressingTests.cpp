@@ -110,3 +110,12 @@ TEST_CASE("ACCUMULATOR ADDRESSING", "[AddressingTests]") {
     cpu.execute_instruction(); // ROR
     REQUIRE(cpu.A == 0x01);
 }
+
+TEST_CASE("INDIRECT ADDRESSING", "[AddressingTests]") {
+    Cpu cpu;
+    cpu.memory.set(0x0237, 0x31);
+    cpu.memory.set(0x0238, 0x88);
+    cpu.program_write({0x6c, 0x37, 0x02});
+    cpu.execute_instruction(); // JMP ($0237)
+    REQUIRE(cpu.PC == 0x8831);
+}

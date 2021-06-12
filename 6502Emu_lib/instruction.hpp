@@ -176,12 +176,10 @@ namespace addressing{
                 switch (Mode){
                     case ACCUMULATOR: // instruction is 1-byte, therefore nothing should be returned.
                         return std::pair(0, false);
-                    case INDIRECT:
-                        cpu.PC += 2;
-                        temp = cpu.memory.get(cpu.memory.get(cpu.PC - 2) | (cpu.memory.get(cpu.PC - 1) << 8)); // 16-bit address
-                        if (GetEffectiveAddress) return std::pair(temp, false);
-                        temp = cpu.memory.get(temp) | (cpu.memory.get(temp+1) << 8); // Get 16-bit address at 16-bit address (deref double pointer).
-                        return std::pair(temp, false); // Return addr -> addr -> addr
+                    case INDIRECT: // Only used in JMP instruction.
+                        temp = cpu.memory.get(cpu.PC) | (cpu.memory.get(cpu.PC + 1) << 8);
+                        temp = cpu.memory.get(temp) | (cpu.memory.get(temp + 1) << 8); // 16-bit address
+                        return std::pair(temp, false); // Return addr -> addr.
                     case ZERO_PAGE_XY:
                         temp = cpu.memory.get(cpu.PC++); // zero-page address
                         temp = 0x00FF & (temp + cpu.Y); // indexed zero-page address ( Adds Y to $aaaa without carry )
@@ -240,7 +238,7 @@ namespace instructions{
         template<bool IsX, bool IsIncrement>
         static cycles INCDEC_REG(Cpu& cpu);
 
-        template<AddressingMode Mode>
+        template<AddressingMode AMode, ModeType MMode>
         static cycles JMP(Cpu& cpu);
 
         template<AddressingMode Mode>
