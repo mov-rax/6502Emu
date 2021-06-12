@@ -145,10 +145,10 @@ namespace addressing{
                         temp = cpu.memory.get(cpu.memory.get(cpu.PC - 2) | (cpu.memory.get(cpu.PC - 1) << 8)); // 16-bit address
                         return std::pair(temp, false);
                     case INDIRECT_Y:
-                        temp = cpu.memory.get(cpu.memory.get(cpu.PC++)); // Deref zero-page address
-                        temp2 = temp;
-                        temp2 = ((temp2 + cpu.Y) & 0xFF00) ^ temp2; // Used to check if page has been crossed or has a carry bit.
-                        temp = ((temp + cpu.Y) & 0x00FF) | ((temp + 1 + temp2) << 8); // Address calculated from ($aa), Y
+                        temp = cpu.memory.get(cpu.PC++); // Deref zero-page address
+                        temp2 = cpu.memory.get(temp);
+                        temp2 = ((temp2 + cpu.Y) & 0x0100) >> 8; // Used to check if page has been crossed or has a carry bit.
+                        temp = ((cpu.memory.get(temp) + cpu.Y) & 0x00FF) | ((cpu.memory.get(temp + 1) + temp2) << 8); // Address calculated from ($aa), Y
                         if (GetEffectiveAddress)
                             return std::pair(temp, temp2);
                         return std::pair(cpu.memory.get(temp) | (cpu.memory.get(temp + 1) << 8), temp2);
