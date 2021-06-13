@@ -7,9 +7,8 @@
 
 class Cpu{
     using size_t = std::size_t;
-private:
-    static const unsigned int STACK_PTR_BASE = 0x0100; // lowest memory address of the SP, which ranges from 0x0100 - 0x01FF
 public:
+    static const unsigned int STACK_PTR_BASE = 0x0100; // lowest memory address of the SP, which ranges from 0x0100 - 0x01FF
     size_t frequency; // Frequency (Hz)
     Mem memory; // Memory (0xFFFF bytes)
     uint8_t A, X, Y, SP; /// Accumulator, Index Register X, Index Register Y, Stack Pointer

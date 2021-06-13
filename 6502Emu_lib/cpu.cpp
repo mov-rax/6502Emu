@@ -12,11 +12,11 @@ void Cpu::execute_instruction() {
 }
 
 auto Cpu::push(uint8_t data) -> void {
-    memory.set(data, STACK_PTR_BASE + SP--);
+    memory.set(STACK_PTR_BASE + SP--, data);
 }
 
 auto Cpu::pop() -> uint8_t {
-    return memory.get(STACK_PTR_BASE + SP++);
+    return memory.get(STACK_PTR_BASE + ++SP);
 }
 
 void Cpu::reset_A() {
