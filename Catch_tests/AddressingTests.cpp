@@ -119,3 +119,29 @@ TEST_CASE("INDIRECT ADDRESSING", "[AddressingTests]") {
     cpu.execute_instruction(); // JMP ($0237)
     REQUIRE(cpu.PC == 0x8831);
 }
+
+TEST_CASE("ZERO_PAGE_X INDEXED ADDRESSING", "[AddressingTests]") {
+    Cpu cpu;
+    cpu.program_write({0xA2, 0x04, 0x86, 0x3A, 0xA2, 0xE9, 0xB5, 0x51});
+    cpu.execute_instruction(); // LDX #$04
+    REQUIRE(cpu.X == 0x04);
+    cpu.execute_instruction(); // STX $3A
+    REQUIRE(cpu.memory.get(0x3A) == cpu.X);
+    cpu.execute_instruction(); // LDX #$E9
+    REQUIRE(cpu.X == 0xE9);
+    cpu.execute_instruction(); // LDA $51, X
+    REQUIRE(cpu.A == 0x04);
+}
+
+TEST_CASE("ZERO_PAGE_Y INDEXED ADDRESSING", "[AddressingTests]") {
+    Cpu cpu;
+    cpu.program_write({0xA9, 0x69, 0x85, 0x20, 0xA0, 0x10, 0xB6, 0x10});
+    cpu.execute_instruction(); // LDA #$69
+    REQUIRE(cpu.A == 0x69);
+    cpu.execute_instruction(); // STA $20
+    REQUIRE(cpu.memory.get(0x20) == cpu.A);
+    cpu.execute_instruction(); // LDY #$10
+    REQUIRE(cpu.Y == 0x10);
+    cpu.execute_instruction(); // LDX $10, Y
+    REQUIRE(cpu.X == 0x69);
+}

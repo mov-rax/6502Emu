@@ -206,7 +206,7 @@ static cycles instructions::EOR(Cpu& cpu){
 /// JMP (Jump)
 template<AddressingMode AMode, ModeType MMode>
 static cycles instructions::JMP(Cpu& cpu){
-    auto data = load_addr<AMode, MMode>(cpu);
+    auto data = load_addr_ref<AMode, MMode>(cpu);
     cpu.PC = data.first;
     return (MMode == NORMAL_MODE) ? 3 : 5;
 }
@@ -233,10 +233,10 @@ static cycles instructions::LDA(Cpu& cpu){
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(Mode) && data.second ? cyc + 1 : cyc;
 }
 
-template<AddressingMode Mode, bool IsX>
+template<AddressingMode Mode, bool IsX, ModeType MMode>
 static cycles instructions::LOAD_REG(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y}, {2,3,4,4,4,4});
-    auto data = load_addr<Mode, NORMAL_MODE>(cpu);
+    auto data = load_addr<Mode, MMode>(cpu);
     uint8_t result;
     if (IsX){ // X Register
         result = (cpu.X = data.first);
@@ -571,7 +571,7 @@ InstructionTable::InstructionTable(){
 
     /// LDX (Load X Register)
     create_instructions({0xA2, 0xA6, 0xB6, 0xAE, 0xBE},
-                        {LOAD_REG<IMMEDIATE, true>, LOAD_REG<ZERO_PAGE, true>, LOAD_REG<ZERO_PAGE_XY, true>, LOAD_REG<ABSOLUTE, true>, LOAD_REG<ABSOLUTE_Y, true>},
+                        {LOAD_REG<IMMEDIATE, true>, LOAD_REG<ZERO_PAGE, true>, LOAD_REG<ZERO_PAGE_XY, true, ALTERNATIVE_MODE>, LOAD_REG<ABSOLUTE, true>, LOAD_REG<ABSOLUTE_Y, true>},
                         "LDX");
 
     /// LDY (Load Y Register)

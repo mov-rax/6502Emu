@@ -247,7 +247,7 @@ namespace instructions{
         template<AddressingMode Mode>
         static cycles LDA(Cpu& cpu);
 
-        template<AddressingMode Mode, bool isX>
+        template<AddressingMode Mode, bool IsX, ModeType MMode = NORMAL_MODE>
         static cycles LOAD_REG(Cpu& cpu);
 
         template<AddressingMode Mode, Bitshift::Enum ShiftType>
