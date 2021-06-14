@@ -2,11 +2,18 @@
 #include <chrono>
 #include <iostream>
 #include <bit>
-#include <concepts>
+
 
 
 using namespace addressing;
 using namespace utils;
+
+/// BEGIN FLAG-SETTING MACROS
+
+#define CHECK_N_FLAG(val) cpu.PS.N = ((val) & 0x80) >> 7
+#define CHECK_Z_FLAG(val) cpu.PS.Z = !(val)
+
+/// END FLAG-SETTING MACROS
 
 /// BEGIN LOCAL FUNCTIONS FOR INTEGER/BCD CONVERSION
 uint8_t conv_to_bcd(uint8_t n) {
@@ -53,9 +60,9 @@ static cycles instructions::ADC(Cpu& cpu){
     }
 
     cpu.PS.C = result & 0x0100;
-    if (!cpu.A) cpu.PS.Z = 1;
     if ((cpu.A & 0x80) ^ (cpu.PS.N << 7)) cpu.PS.V = 1;
-    if (cpu.A & 0x80) cpu.PS.N = 1;
+    CHECK_Z_FLAG(cpu.A);
+    CHECK_N_FLAG(cpu.A);
 
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(mode) && data.second ? cyc + 1 : cyc;
 }
@@ -66,8 +73,8 @@ static cycles instructions::AND(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y}, {2, 3, 4, 4, 4, 4, 6, 5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     cpu.A &= data.first;
-    if (!cpu.A) cpu.PS.Z = 1;
-    if (cpu.A & 0x80) cpu.PS.N = 1;
+    CHECK_Z_FLAG(cpu.A);
+    CHECK_N_FLAG(cpu.A);
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(Mode) && data.second ? cyc + 1 : cyc;
 }
 
@@ -86,8 +93,8 @@ static cycles instructions::ASL(Cpu& cpu){
         cpu.memory.set(data.first, tmp << 1);
     }
     cpu.PS.C = tmp >> 8;
-    if (!tmp) cpu.PS.Z = 1;
-    if (tmp & 0x0080) cpu.PS.N = 1;
+    CHECK_Z_FLAG(tmp);
+    CHECK_N_FLAG(tmp);
     return cyc;
 }
 
@@ -114,10 +121,10 @@ static cycles instructions::BIT(Cpu &cpu){
     constexpr cycles cyc = get_cycles<Mode>({ZERO_PAGE, ABSOLUTE}, {3, 4});
     std::pair<uint16_t, bool> data = load_addr<Mode, NORMAL_MODE>(cpu);
     uint8_t value = cpu.A & data.first;
-    if (value) cpu.PS.Z = 1;
-    if (!value) cpu.PS.Z = 0;
-    cpu.PS.N = value >> 7;
-    cpu.PS.V = (value & 0x40) >> 6;
+
+    CHECK_Z_FLAG(value);
+    CHECK_N_FLAG(data.first);
+    cpu.PS.V = (data.first & 0x40) >> 6;
     return cyc;
 }
 
@@ -172,8 +179,8 @@ static cycles instructions::INCDEC_MEMORY(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X}, {5,6,6,7});
     auto data = load_addr_ref<Mode, NORMAL_MODE>(cpu);
     uint8_t result = IsIncrement ?  cpu.memory.get(data.first)+1 : cpu.memory.get(data.first)-1;
-    if (!result) cpu.PS.Z = 1;
-    if (result & 0x80) cpu.PS.N = 1;
+    CHECK_Z_FLAG(result);
+    CHECK_N_FLAG(result);
     cpu.memory.set(data.first, result); // decrements
     return cyc;
 }
@@ -184,10 +191,10 @@ static cycles instructions::INCDEC_REG(Cpu& cpu){
     uint8_t result;
     if (IsX)
         cpu.X = (result = IsIncrement ? cpu.X+1 : cpu.X-1);
-     else
+    else
         cpu.Y = (result = IsIncrement ? cpu.Y+1 : cpu.Y-1);
-    if (!result) cpu.PS.Z = 1;
-    if (result & 0x80) cpu.PS.N = 1;
+    CHECK_Z_FLAG(result);
+    CHECK_N_FLAG(result);
     return cyc;
 }
 
@@ -198,8 +205,8 @@ static cycles instructions::EOR(Cpu& cpu){
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     cpu.A ^= data.first;
-    if (!cpu.A) cpu.PS.Z = 1;
-    if (cpu.A & 0x80) cpu.PS.N = 1;
+    CHECK_Z_FLAG(cpu.A);
+    CHECK_N_FLAG(cpu.A);
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(Mode) && data.second ? cyc+1 : cyc;
 }
 
@@ -228,8 +235,8 @@ static cycles instructions::LDA(Cpu& cpu){
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     cpu.A = data.first;
-    if (!cpu.A) cpu.PS.Z = 1;
-    if (cpu.A & 0x80) cpu.PS.N = 1;
+    CHECK_Z_FLAG(cpu.A);
+    CHECK_N_FLAG(cpu.A);
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(Mode) && data.second ? cyc + 1 : cyc;
 }
 
@@ -243,8 +250,8 @@ static cycles instructions::LOAD_REG(Cpu& cpu){
     } else { // Y Register
         result = (cpu.Y = data.first);
     }
-    if (!result) cpu.PS.Z = 1;
-    if (result & 0x80) cpu.PS.N = 1;
+    CHECK_Z_FLAG(result);
+    CHECK_N_FLAG(result);
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y>(Mode) && data.second ? cyc + 1 : cyc;
 }
 
@@ -307,8 +314,8 @@ static cycles instructions::ORA(Cpu& cpu){
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     cpu.A |= data.first;
-    if (!cpu.A) cpu.PS.Z = 1;
-    if (cpu.A & 0x80) cpu.PS.N = 1;
+    CHECK_N_FLAG(cpu.A);
+    CHECK_Z_FLAG(cpu.A);
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(Mode) && data.second ? cyc + 1 : cyc;
 }
 
@@ -329,8 +336,8 @@ static cycles instructions::PULL_REG(Cpu& cpu){
     uint8_t result = cpu.pop();
     if (IsAcc){
         cpu.A = result;
-        if (!cpu.A) cpu.PS.Z = 1;
-        if (cpu.A & 0x80) cpu.PS.N = 1;
+        CHECK_N_FLAG(cpu.A);
+        CHECK_Z_FLAG(cpu.A);
     } else {
         cpu.PS.set(result);
     }
@@ -375,13 +382,11 @@ static cycles instructions::SBC(Cpu& cpu){
         result = cpu.A + number - !cpu.PS.C;
         cpu.A = result;
     }
-    if (!cpu.A)
-        cpu.PS.Z = 1;
-    else
-        cpu.PS.Z = 0;
 
     if ((cpu.A & 0x80) ^ (cpu.PS.N << 7)) cpu.PS.V = 1;
-    if (cpu.A & 0x80) cpu.PS.N = 1;
+    CHECK_Z_FLAG(cpu.A);
+    CHECK_N_FLAG(cpu.A);
+
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(Mode) && data.second ? cyc + 1 : cyc;
 }
 
@@ -415,13 +420,13 @@ static cycles instructions::TRANSFER_REG(Cpu& cpu){
             switch (ToReg){
                 case Register::X:
                     cpu.X = cpu.A;
-                    if (!cpu.X) cpu.PS.Z = 1;
-                    if (cpu.X & 0x80) cpu.PS.N = 1;
+                    CHECK_Z_FLAG(cpu.X);
+                    CHECK_N_FLAG(cpu.X);
                     break;
                 case Register::Y:
                     cpu.Y = cpu.A;
-                    if (!cpu.Y) cpu.PS.Z = 1;
-                    if (cpu.Y & 0x80) cpu.PS.N = 1;
+                    CHECK_Z_FLAG(cpu.Y);
+                    CHECK_N_FLAG(cpu.Y);
                     break;
                 default:
                     throw std::runtime_error(error_words);
@@ -431,8 +436,8 @@ static cycles instructions::TRANSFER_REG(Cpu& cpu){
             switch (ToReg){
                 case Register::A:
                     cpu.A = cpu.X;
-                    if (!cpu.A) cpu.PS.Z = 1;
-                    if (cpu.A & 0x80) cpu.PS.N = 1;
+                    CHECK_Z_FLAG(cpu.A);
+                    CHECK_N_FLAG(cpu.A);
                     break;
                 case Register::SP:
                     cpu.SP = cpu.X;
@@ -446,16 +451,16 @@ static cycles instructions::TRANSFER_REG(Cpu& cpu){
                 cpu.A = cpu.Y;
             else
                 throw std::runtime_error(error_words);
-            if (!cpu.A) cpu.PS.Z = 1;
-            if (cpu.A & 0x80) cpu.PS.N = 1;
+            CHECK_Z_FLAG(cpu.A);
+            CHECK_N_FLAG(cpu.A);
             break;
         case Register::SP:
             if (ToReg == Register::X)
                 cpu.X = cpu.SP;
             else
                 throw std::runtime_error(error_words);
-            if (!cpu.X) cpu.PS.Z = 1;
-            if (cpu.X & 0x80) cpu.PS.N = 1;
+            CHECK_Z_FLAG(cpu.X);
+            CHECK_N_FLAG(cpu.X);
             break;
     }
     return cyc;

@@ -67,3 +67,28 @@ TEST_CASE("Stack Operations", "[InstructionTests]") {
     cpu.execute_instruction(); // PLP
     REQUIRE(cpu.PS.conv() == cpu.memory.get(cpu.STACK_PTR_BASE + cpu.SP));
 }
+
+TEST_CASE("Logical Operations", "[InstructionTests]") {
+    Cpu cpu;
+    cpu.program_write({0xA9, 0xFF, 0x29, 0xAA, 0x49, 0xAA, 0x09, 0xBB, 0xA2, 0xFC, 0x86, 0x40, 0x24, 0x40});
+    cpu.execute_instruction(); // LDA #$FF
+    REQUIRE(cpu.A == 0xFF);
+    cpu.execute_instruction(); // AND #$AA
+    REQUIRE(cpu.A == 0xAA);
+    REQUIRE(cpu.PS.N == 1);
+    cpu.execute_instruction(); // EOR #$AA
+    REQUIRE(cpu.A == 0x00);
+    REQUIRE(cpu.PS.N == 0);
+    REQUIRE(cpu.PS.Z == 1);
+    cpu.execute_instruction(); // ORA #$BB
+    REQUIRE(cpu.A == 0xBB);
+    REQUIRE(cpu.PS.N == 1);
+    cpu.execute_instruction(); // LDX #$FC
+    REQUIRE(cpu.X == 0xFC);
+    cpu.execute_instruction(); // STX $40
+    REQUIRE(cpu.memory.get(0x40) == cpu.X);
+    cpu.execute_instruction(); // BIT $40
+    REQUIRE(cpu.PS.N == 1);
+    REQUIRE(cpu.PS.V == 1);
+    REQUIRE(cpu.PS.C == 0);
+}
