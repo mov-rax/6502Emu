@@ -1,0 +1,1 @@
+/usr/bin/g++ -g CMakeFiles/6502Emu.dir/main.cpp.o -o 6502Emu  6502Emu_lib/lib6502Emu_lib.a 

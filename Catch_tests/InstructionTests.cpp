@@ -92,3 +92,64 @@ TEST_CASE("Logical Operations", "[InstructionTests]") {
     REQUIRE(cpu.PS.V == 1);
     REQUIRE(cpu.PS.C == 0);
 }
+
+TEST_CASE("Shift Operations", "[InstructionTests]") {
+    Cpu cpu;
+    cpu.program_write({0xa9, 0xf1, 0x0a, 0x18, 0x4a, 0x38, 0x2a, 0xa9, 0x01, 0x6a, 0x6a});
+    cpu.execute_instruction(); // LDA #$F1
+    REQUIRE(cpu.A == 0xF1);
+    cpu.execute_instruction(); // ASL A
+    REQUIRE(cpu.A == 0xE2); 
+    REQUIRE(cpu.PS.C == 1);
+    REQUIRE(cpu.PS.N == 1);
+    cpu.execute_instruction(); // CLC
+    REQUIRE(cpu.PS.C == 0);
+    cpu.execute_instruction(); // LSR A
+    REQUIRE(cpu.A == 0x71);
+    REQUIRE(cpu.PS.C == 0);
+    REQUIRE(cpu.PS.N == 0);
+    cpu.execute_instruction(); // SEC
+    REQUIRE(cpu.PS.C == 1);
+    cpu.execute_instruction(); // ROL A
+    REQUIRE(cpu.A == 0xE3);
+    REQUIRE(cpu.PS.C == 0);
+    REQUIRE(cpu.PS.N == 1);
+    cpu.execute_instruction(); // LDA #$01
+    REQUIRE(cpu.A == 0x01);
+    REQUIRE(cpu.PS.C == 0);
+    REQUIRE(cpu.PS.N == 0);
+    cpu.execute_instruction(); // ROR A
+    REQUIRE(cpu.A == 0);
+    REQUIRE(cpu.PS.C == 1);
+    cpu.execute_instruction(); // ROR A
+    REQUIRE(cpu.A == 0x80);
+    REQUIRE(cpu.PS.C == 0);
+}
+
+TEST_CASE("Decrements and Increments", "[InstructionTests]"){
+    Cpu cpu;
+    cpu.program_write({0xa9, 0x20, 0x85, 0x10, 0xc6, 0x10, 0xa5, 0x10, 0xca, 0x88, 0xe6, 0x10, 0xa5, 0x10, 0xe8, 0xc8});
+    cpu.execute_instruction(); // LDA #$20
+    REQUIRE(cpu.A == 0x20);
+    cpu.execute_instruction(); // STA $10
+    REQUIRE(cpu.memory.get(0x10) == cpu.A);
+    cpu.execute_instruction(); // DEC $10
+    REQUIRE(cpu.memory.get(0x10) == 0x1F);
+    cpu.execute_instruction(); // LDA $10
+    REQUIRE(cpu.memory.get(0x10) == cpu.A);
+    cpu.execute_instruction(); // DEX
+    REQUIRE(cpu.X == 0xFF);
+    REQUIRE(cpu.PS.N == 1);
+    cpu.execute_instruction(); // DEY 
+    REQUIRE(cpu.Y == 0xFF);
+    REQUIRE(cpu.PS.N == 1);
+    cpu.execute_instruction(); // INC $10
+    REQUIRE(cpu.memory.get(0x10) == 0x20);
+    REQUIRE(cpu.PS.N == 0);
+    cpu.execute_instruction(); // LDA $10
+    REQUIRE(cpu.A == 0x20);
+    cpu.execute_instruction(); // INX
+    REQUIRE(cpu.X == 0);
+    cpu.execute_instruction(); // INY
+    REQUIRE(cpu.Y == 0);
+}

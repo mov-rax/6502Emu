@@ -85,8 +85,10 @@ static cycles instructions::ASL(Cpu& cpu){
     std::pair<uint16_t, bool> data;
     uint16_t tmp;
     if (contains_modes<ACCUMULATOR>(Mode)){
+        //cpu.PS.C = cpu.A & 0x80;
         tmp = cpu.A << 1;
         cpu.A = tmp;
+        //cpu.PS.N = cpu.A & 0x80;
     } else {
         data = load_addr_ref<Mode, NORMAL_MODE>(cpu);
         tmp = cpu.memory.get(data.first);
@@ -257,19 +259,23 @@ static cycles instructions::LOAD_REG(Cpu& cpu){
 
 template<AddressingMode Mode, Bitshift::Enum ShiftType>
 static cycles instructions::BITSHIFT(Cpu& cpu){
+    uint16_t tmp;
     constexpr cycles cyc = get_cycles<Mode>({ACCUMULATOR, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X}, {2,5,6,6,7});
     if (contains_modes<ACCUMULATOR>(Mode)){
         switch (ShiftType){
             case Bitshift::ROTATE_LEFT:
-                cpu.PS.C = cpu.A & 0x80;
-                cpu.A = std::rotl(cpu.A, 1);
+                tmp = (cpu.A << 1) | cpu.PS.C;
+                cpu.PS.C = tmp & 0x100;
+                cpu.A = tmp & 0xFF;
                 break;
             case Bitshift::ROTATE_RIGHT:
-                cpu.PS.C = cpu.A & 1;
-                cpu.A = std::rotr(cpu.A, 1);
+                tmp = (cpu.PS.C << 7) | (cpu.A >> 1);
+                cpu.PS.C = cpu.A & 0x01;
+                cpu.A = tmp & 0xFF;
                 break;
             case Bitshift::SHIFT_RIGHT:
                 cpu.PS.C = cpu.A & 1;
+                cpu.PS.N = 0;
                 cpu.A >>= 1;
                 break;
         }
@@ -280,24 +286,26 @@ static cycles instructions::BITSHIFT(Cpu& cpu){
     auto data = load_addr_ref<Mode, NORMAL_MODE>(cpu);
     cpu.PS.C = data.first & 1;
     uint8_t value = cpu.memory.get(data.first);
-    uint8_t result;
     switch (ShiftType){
         case Bitshift::ROTATE_LEFT:
-            result = std::rotl(value, 1);
-            cpu.PS.C = value & 0x80;
+            tmp = (value << 1) | cpu.PS.C;
+            cpu.PS.C = tmp & 0x100;
+            value = tmp & 0xFF;
             break;
         case Bitshift::ROTATE_RIGHT:
-            result = std::rotr(value, 1);
-            cpu.PS.C = value & 1;
+            tmp = (cpu.PS.C << 7) | (value >> 1);
+            cpu.PS.C = value & 0x01;
+            value = tmp & 0xFF;
             break;
         case Bitshift::SHIFT_RIGHT:
-            result = value >> 1;
             cpu.PS.C = value & 1;
+            cpu.PS.N = 0;
+            value >>= 1;
             break;
-
     }
-    if (!result) cpu.PS.Z = 1;
-    if (result & 0x80) cpu.PS.N = 1;
+
+    if (!value) cpu.PS.Z = 1;
+    if (value & 0x80) cpu.PS.N = 1;
     return cyc;
 }
 
@@ -466,6 +474,8 @@ static cycles instructions::TRANSFER_REG(Cpu& cpu){
     return cyc;
 }
 
+#define CREATE_INSTRUCTION(opcode, innies...) table[opcode] = Instruction(innies)
+
 InstructionTable::InstructionTable(){
     using namespace instructions;
     auto time_begin = std::chrono::steady_clock::now();
@@ -484,13 +494,17 @@ InstructionTable::InstructionTable(){
                         {ASL<ACCUMULATOR>, ASL<ZERO_PAGE>, ASL<ZERO_PAGE_XY>, ASL<ABSOLUTE>, ASL<ABSOLUTE_X>},
                         "ASL");
 
+    
     /// BCC
+    //CREATE_INSTRUCTION(0x90, BRANCH<CARRY_FLAG, false>, "BCC");
     create_instructions({0x90}, {BRANCH<CARRY_FLAG, false>}, "BCC");
 
     /// BCS
+    //CREATE_INSTRUCTION(0xB0, BRANCH<CARRY_FLAG, true>, "BCS");
     create_instructions({0xB0}, {BRANCH<CARRY_FLAG, true>}, "BCS");
 
     /// BEQ
+    //CREATE_INSTRUCTION(0xF0, BRANCH<ZERO_FLAG, true>, "BEQ");
     create_instructions({0xF0}, {BRANCH<ZERO_FLAG, true>}, "BEQ");
 
     /// BIT

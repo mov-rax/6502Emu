@@ -1,0 +1,9 @@
+/home/movrax/Documents/6502Emu/CMakeFiles/6502Emu.dir
+/home/movrax/Documents/6502Emu/CMakeFiles/edit_cache.dir
+/home/movrax/Documents/6502Emu/CMakeFiles/rebuild_cache.dir
+/home/movrax/Documents/6502Emu/6502Emu_lib/CMakeFiles/6502Emu_lib.dir
+/home/movrax/Documents/6502Emu/6502Emu_lib/CMakeFiles/edit_cache.dir
+/home/movrax/Documents/6502Emu/6502Emu_lib/CMakeFiles/rebuild_cache.dir
+/home/movrax/Documents/6502Emu/Catch_tests/CMakeFiles/Catch_tests_run.dir
+/home/movrax/Documents/6502Emu/Catch_tests/CMakeFiles/edit_cache.dir
+/home/movrax/Documents/6502Emu/Catch_tests/CMakeFiles/rebuild_cache.dir

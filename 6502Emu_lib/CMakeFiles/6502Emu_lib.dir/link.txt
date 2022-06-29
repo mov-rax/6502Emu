@@ -1,0 +1,2 @@
+/usr/bin/ar qc lib6502Emu_lib.a CMakeFiles/6502Emu_lib.dir/cpu.cpp.o CMakeFiles/6502Emu_lib.dir/instruction.cpp.o CMakeFiles/6502Emu_lib.dir/mem.cpp.o
+/usr/bin/ranlib lib6502Emu_lib.a

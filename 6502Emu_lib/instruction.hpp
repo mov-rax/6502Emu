@@ -5,6 +5,7 @@
 #include <array>
 #include <utility>
 #include <vector>
+#include <stdexcept>
 
 #include "cpu.hpp"
 #ifndef INSTRUCTION
@@ -29,6 +30,10 @@ private:
         for (int i = 0; i < N; i++){
             table[codes[i]] = Instruction(funcs[i], name);
         }
+    }
+
+    auto create_instructions(const int code, const instruction_function<Cpu&> func, const std::string name){
+        table[code] = Instruction(func, name);
     }
     std::array<Instruction, 0xFF> table;
 public:

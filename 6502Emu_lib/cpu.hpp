@@ -15,13 +15,13 @@ public:
     uint16_t PC; // Program Counter
     /// Processor Status (SIGN FLAG, OVERFLOW FLAG, B FLAG, DECIMAL MODE FLAG, INTERRUPT DISABLE FLAG, ZERO FLAG, CARRY FLAG)
     struct {
-        uint8_t C : 1;
-        uint8_t Z : 1;
-        uint8_t I : 1;
-        uint8_t D : 1;
-        uint8_t B : 2;
-        uint8_t V : 1;
-        uint8_t N : 1;
+        uint8_t C : 1; // CARRY
+        uint8_t Z : 1; // ZERO
+        uint8_t I : 1; // INTERRUPT DISABLE
+        uint8_t D : 1; // DECIMAL
+        uint8_t B : 2; // B
+        uint8_t V : 1; // OVERFLOW
+        uint8_t N : 1; // SIGN
 
         auto conv() const -> uint8_t {
             return C | Z << 1 | I << 2 | D << 3 | B << 4 | V << 6 | N << 7;
