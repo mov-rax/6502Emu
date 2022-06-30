@@ -92,16 +92,22 @@ namespace addressing{
             switch (Flag){
                 case NEGATIVE_FLAG:
                     cpu.PS.N = Value;
+                    break;
                 case OVERFLOW_FLAG:
                     cpu.PS.V = Value;
+                    break;
                 case B_FLAGS:
                     throw std::runtime_error("set_flag is not compatible with PSFlagType B_FLAGS");
+                    break;
                 case DECIMAL_FLAG:
                     cpu.PS.D = Value;
+                    break;
                 case INTERRUPT_DISABLE_FLAG:
                     cpu.PS.I = Value;
+                    break;
                 case ZERO_FLAG:
                     cpu.PS.Z = Value;
+                    break;
                 case CARRY_FLAG:
                     cpu.PS.C = Value;
             }

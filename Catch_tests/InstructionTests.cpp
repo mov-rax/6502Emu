@@ -153,3 +153,30 @@ TEST_CASE("Decrements and Increments", "[InstructionTests]"){
     cpu.execute_instruction(); // INY
     REQUIRE(cpu.Y == 0);
 }
+
+TEST_CASE("Flag operations", "[InstructionTests]") {
+    Cpu cpu;
+    cpu.program_write({0x38, 0x18, 0xf8, 0xd8, 0x78, 0x58, 0x38, 0xa9, 0x7f, 0x69, 0x40, 0xb8 });
+    cpu.execute_instruction(); // SEC
+    REQUIRE(cpu.PS.C == 1);
+    cpu.execute_instruction(); // CLC
+    REQUIRE(cpu.PS.C == 0);
+    cpu.execute_instruction(); // SED
+    REQUIRE(cpu.PS.D == 1);
+    cpu.execute_instruction(); // CLD
+    REQUIRE(cpu.PS.D == 0);
+    cpu.execute_instruction(); // SEI
+    REQUIRE(cpu.PS.I == 1);
+    cpu.execute_instruction(); // CLI
+    REQUIRE(cpu.PS.I == 0);
+    cpu.execute_instruction(); // SEC
+    REQUIRE(cpu.PS.C == 1);
+    cpu.execute_instruction(); // LDA #$7F
+    REQUIRE(cpu.A == 0x7F);
+    cpu.execute_instruction(); // ADC #$40
+    REQUIRE(cpu.A == 0xC0);
+    REQUIRE(cpu.PS.V == 1);
+    REQUIRE(cpu.PS.N == 1);
+    cpu.execute_instruction(); // CLV
+    REQUIRE(cpu.PS.V == 0);
+}
