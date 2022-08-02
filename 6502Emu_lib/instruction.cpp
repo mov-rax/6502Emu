@@ -43,26 +43,52 @@ template<AddressingMode mode>
 static cycles instructions::ADC(Cpu& cpu){
     constexpr cycles cyc = get_cycles<mode, 8>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},{2,3,4,4,4,4,6,5});
     auto data = load_addr<mode, NORMAL_MODE>(cpu);
-    uint8_t number;
-    uint16_t result;
-    if (cpu.PS.D){ // BCD
-        number = conv_to_int(data.first);
-        result = (uint16_t)cpu.A + number + cpu.PS.C;
-        if (result & 0x0080){
-            cpu.A = conv_to_bcd((~result + 1) % 100); // 2's complement
-        } else {
-            cpu.A = conv_to_bcd(result % 100);
-        }
-    } else { // Normal
-        number = data.first;
-        result = (uint16_t)cpu.A + number + cpu.PS.C;
-        cpu.A = result;
+
+    if (cpu.PS.D) { // BCD (NOT YET IMPLEMENTED
+        uint8_t number = conv_to_int(data.first);
+        uint16_t result = (uint16_t)conv_to_int(cpu.A) + (uint16_t)number + (uint16_t)cpu.PS.C;
+        // Ensure that value is BCD 0 to 99.
+        // if (result & 0x80) { // is negative
+        //     cpu.A = conv_to_bcd((~result + 1) % 100); // 2's complement
+        // } else {
+        //     cpu.A = conv_to_bcd(result % 100);
+        // }
+        uint16_t trimmed_result = result % 100;
+        cpu.A = conv_to_bcd(trimmed_result);
+        cpu.PS.C = (result >= 100);
+        cpu.PS.Z = (cpu.A == 0);
+        cpu.PS.N = (trimmed_result & 0x80) > 0;
+        cpu.PS.V = ((~((uint16_t)cpu.A ^ (uint16_t)data.first)) & ((uint16_t)cpu.A ^ (result)) & 0x80) > 0;
+    } else {
+        uint16_t result = (uint16_t)cpu.A + (uint16_t)data.first + (uint16_t)cpu.PS.C;
+        cpu.PS.C = result > 255;
+        cpu.PS.N = (result & 0x80) > 0;
+        cpu.PS.Z = (result & 0xFF) == 0;
+        cpu.PS.V = ((~((uint16_t)cpu.A ^ (uint16_t)data.first)) & ((uint16_t)cpu.A ^ (result)) & 0x80) > 0;
+        cpu.A = (uint8_t)(result & 0xFF);
     }
 
-    cpu.PS.C = result & 0x0100;
-    if ((cpu.A & 0x80) ^ (cpu.PS.N << 7)) cpu.PS.V = 1;
-    CHECK_Z_FLAG(cpu.A);
-    CHECK_N_FLAG(cpu.A);
+    
+    // uint8_t number;
+    // uint16_t result;
+    // if (cpu.PS.D){ // BCD
+    //     number = conv_to_int(data.first);
+    //     result = (uint16_t)cpu.A + number + cpu.PS.C;
+    //     if (result & 0x0080){
+    //         cpu.A = conv_to_bcd((~result + 1) % 100); // 2's complement
+    //     } else {
+    //         cpu.A = conv_to_bcd(result % 100);
+    //     }
+    // } else { // Normal
+    //     number = data.first;
+    //     result = (uint16_t)cpu.A + number + cpu.PS.C;
+    //     cpu.A = result;
+    // }
+
+    // cpu.PS.C = result & 0x0100;
+    // if ((cpu.A & 0x80) ^ (cpu.PS.N << 7)) cpu.PS.V = 1;
+    // CHECK_Z_FLAG(cpu.A);
+    // CHECK_N_FLAG(cpu.A);
 
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(mode) && data.second ? cyc + 1 : cyc;
 }

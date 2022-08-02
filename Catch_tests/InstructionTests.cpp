@@ -229,3 +229,93 @@ TEST_CASE("Branching Test", "[InstructionTests]") {
     cpu.execute_instruction(); // STX $0201
     REQUIRE(cpu.memory.get(0x0201) == 0x03);
 }
+
+TEST_CASE("Addition Tests", "[InstructionTests]") {
+    Cpu cpu;
+    cpu.program_write({
+        0xa9, 0x02, 0x69, 0x03, 0xa9, 0x02, 0x38, 0x69, 0x03, 0xa9, 
+        0x02, 0x69, 0xfe, 0xa9, 0x02, 0x18, 0x69, 0xfd, 0xa9, 0xfd, 
+        0x69, 0x06, 0xa9, 0x7d, 0x69, 0x02
+        });
+    cpu.execute_instruction(); // LDA #2
+    REQUIRE(cpu.A == 0x2);
+    cpu.execute_instruction(); // ADC #3
+    REQUIRE(cpu.A == 0x5);
+    REQUIRE(cpu.PS.N == 0);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 0);
+    REQUIRE(cpu.PS.V == 0);
+    cpu.execute_instruction(); // LDA #2
+    REQUIRE(cpu.A == 0x2);
+    cpu.execute_instruction(); // SEC
+    REQUIRE(cpu.PS.C == 1);
+    cpu.execute_instruction(); // ADC #3
+    REQUIRE(cpu.A == 6);
+    REQUIRE(cpu.PS.N == 0);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 0);
+    REQUIRE(cpu.PS.V == 0);
+    cpu.execute_instruction(); // LDA #2
+    REQUIRE(cpu.A == 0x2);
+    cpu.execute_instruction(); // ADC #254
+    REQUIRE(cpu.A == 0);
+    REQUIRE(cpu.PS.N == 0);
+    REQUIRE(cpu.PS.Z == 1);
+    REQUIRE(cpu.PS.C == 1);
+    REQUIRE(cpu.PS.V == 0);
+    cpu.execute_instruction(); // LDA #2
+    REQUIRE(cpu.A == 2);
+    REQUIRE(cpu.PS.Z == 0);
+    cpu.execute_instruction(); // CLC
+    REQUIRE(cpu.PS.C == 0);
+    cpu.execute_instruction(); // ADC #253
+    REQUIRE(cpu.A == 255);
+    REQUIRE(cpu.PS.N == 1);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 0);
+    REQUIRE(cpu.PS.V == 0);
+    cpu.execute_instruction(); // LDA #253
+    REQUIRE(cpu.A == 253);
+    cpu.execute_instruction(); // ADC #6
+    REQUIRE(cpu.A == 3);
+    REQUIRE(cpu.PS.N == 0);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 1);
+    REQUIRE(cpu.PS.V == 0);
+    cpu.execute_instruction(); // LDA #125
+    REQUIRE(cpu.A == 125);
+    cpu.execute_instruction(); // ADC #2
+    REQUIRE(cpu.A == 128);
+    REQUIRE(cpu.PS.N == 1);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 0);
+    REQUIRE(cpu.PS.V == 1);
+}
+
+TEST_CASE("BCD Addition Tests", "[InstructionTests]") {
+    Cpu cpu;
+    cpu.program_write({0xf8, 0xa9, 0x99, 0x69, 0x01, 0xa9, 0x79, 0x69, 0x79, 0x69, 0x10});
+    cpu.execute_instruction(); // SED
+    REQUIRE(cpu.PS.D == 1);
+    cpu.execute_instruction(); // LDA #$99
+    REQUIRE(cpu.A == 0x99);
+    cpu.execute_instruction(); // ADC #$01
+    REQUIRE(cpu.A == 0);
+    REQUIRE(cpu.PS.Z == 1);
+    REQUIRE(cpu.PS.C == 1);
+    cpu.execute_instruction(); // LDA #$79
+    REQUIRE(cpu.A == 0x79);
+    REQUIRE(cpu.PS.Z == 0);
+    cpu.execute_instruction(); // ADC #$79
+    REQUIRE(cpu.A == 0x59);
+    REQUIRE(cpu.PS.C == 1);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.V == 1);
+    REQUIRE(cpu.PS.N == 0);
+    cpu.execute_instruction(); // ADC #$10
+    REQUIRE(cpu.A == 0x70);
+    REQUIRE(cpu.PS.C == 0);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.V == 0);
+    REQUIRE(cpu.PS.N == 0);
+}
