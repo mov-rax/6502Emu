@@ -103,7 +103,8 @@ static cycles instructions::ASL(Cpu& cpu){
 /// BRANCH (Generic function for all relative branching in the 6502)
 template<PSFlagType Flag, bool IsSet>
 static cycles instructions::BRANCH(Cpu& cpu){
-    uint16_t branch_location = cpu.PC + (int16_t)cpu.memory.get(cpu.PC++);
+    int8_t data = std::bit_cast<int8_t, uint8_t>(cpu.memory.get(cpu.PC++));
+    uint16_t branch_location = (uint16_t)((int16_t)cpu.PC + (int16_t)data);
     if (is_flag<Flag, IsSet>(cpu)){
         if ((branch_location & 0xFF00) ^ (cpu.PC & 0xFF00)){ // Check if to a new page.
             cpu.PC = branch_location;
@@ -155,9 +156,9 @@ static cycles instructions::CMP(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
-    if (cpu.A >= data.first) cpu.PS.C = 1;
-    if (cpu.A == data.first) cpu.PS.Z = 1;
-    if (data.first & 0x80) cpu.PS.N = 1;
+    cpu.PS.N = ((cpu.A - data.first) & 0x80) > 0;
+    cpu.PS.Z = (cpu.A == data.first);
+    cpu.PS.C = (cpu.A >= data.first);
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(Mode) && data.second ? cyc + 1 : cyc;
 }
 
@@ -165,14 +166,15 @@ template<AddressingMode Mode, bool IsX>
 static cycles instructions::CMP_REG(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ABSOLUTE}, {2,3,4});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
-    if (IsX){ // X Register
-        if (cpu.X >= data.first) cpu.PS.C = 1;
-        if (cpu.X == data.first) cpu.PS.Z = 1;
-    } else { // Y Register
-        if (cpu.Y >= data.first) cpu.PS.C = 1;
-        if (cpu.Y == data.first) cpu.PS.Z = 1;
+    if (IsX) {
+        cpu.PS.N = ((cpu.X - data.first) & 0x80) > 0;
+        cpu.PS.Z = (cpu.X == data.first);
+        cpu.PS.C = (cpu.X >= data.first);
+    } else {
+        cpu.PS.N = ((cpu.Y - data.first) & 0x80) > 0;
+        cpu.PS.Z = (cpu.Y == data.first);
+        cpu.PS.C = (cpu.Y >= data.first);
     }
-    if (data.first & 0x80) cpu.PS.N = 1;
     return cyc;
 }
 

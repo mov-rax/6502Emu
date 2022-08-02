@@ -180,3 +180,52 @@ TEST_CASE("Flag operations", "[InstructionTests]") {
     cpu.execute_instruction(); // CLV
     REQUIRE(cpu.PS.V == 0);
 }
+
+TEST_CASE("Comparisons Test", "[InstructionTests]") {
+    Cpu cpu;
+    cpu.program_write({0xa9, 0x42, 0xc9, 0x42, 0xc9, 0x43, 0xc9, 0x41 });
+    cpu.execute_instruction(); // LDA #$42
+    REQUIRE(cpu.A == 0x42);
+    cpu.execute_instruction(); // CMP #$42
+    REQUIRE(cpu.PS.Z == 1);
+    REQUIRE(cpu.PS.C == 1);
+    REQUIRE(cpu.PS.N == 0);
+    cpu.execute_instruction(); // CMP #$43
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 0);
+    REQUIRE(cpu.PS.N == 1);
+    cpu.execute_instruction(); // CMP #$41
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 1);
+    REQUIRE(cpu.PS.N == 0);
+}
+
+TEST_CASE("Branching Test", "[InstructionTests]") {
+    Cpu cpu;
+    cpu.program_write({0xa2, 0x08, 0xca, 0x8e, 0x00, 0x02, 0xe0, 0x03, 0xd0, 0xf8, 0x8e, 0x01, 0x02, 0x00});
+    cpu.execute_instruction(); // LDX #$08
+    REQUIRE(cpu.X == 0x08);
+    auto label = cpu.PC;
+    for (int i = cpu.X-1; i >= 3; i--){
+        cpu.execute_instruction(); // DEX <-- decrement: (label)
+        REQUIRE(cpu.X == i);
+        cpu.execute_instruction(); // STX $0200
+        REQUIRE(cpu.memory.get(0x0200) == i);
+        cpu.execute_instruction(); // CPX #$03
+        if (i != 3) {
+            REQUIRE(cpu.PS.N == 0);
+            REQUIRE(cpu.PS.Z == 0);
+            REQUIRE(cpu.PS.C == 1);
+            cpu.execute_instruction(); // BNE decrement: (label)
+            REQUIRE(cpu.PC == label);
+        } else {
+            REQUIRE(cpu.PS.N == 0);
+            REQUIRE(cpu.PS.Z == 1);
+            REQUIRE(cpu.PS.C == 1);
+            cpu.execute_instruction(); // BNE decrement: no branch
+        }
+        
+    }
+    cpu.execute_instruction(); // STX $0201
+    REQUIRE(cpu.memory.get(0x0201) == 0x03);
+}
