@@ -1,14 +1,19 @@
 #include "cpu.hpp"
 #include "instruction.hpp"
-#include <iostream>
+#include <fmt/ostream.h>
+#include <fmt/color.h>
 
 static const InstructionTable table;
 
 void Cpu::execute_instruction() {
+    #if ENABLE_INSTRUCTION_DEBUG_INFO
+    DecompiledInstruction d_instr(table, memory, (std::size_t)PC);
+    fmt::print(fmt::emphasis::bold | fmt::fg(fmt::color::aqua),
+        "{}\n", d_instr.to_string());
+    #endif;
     Instruction instr = table.get(this->memory.get(this->PC++));
-    std::cout << "Instruction: " << instr.id << "\n";
+    AddressingMode mode = instr.mode;
     cycles cyc = instr.run(*this);
-    std::cout << "Cycles: " << cyc << "\n";
 }
 
 auto Cpu::push(uint8_t data) -> void {
@@ -77,19 +82,19 @@ void Cpu::reset_C() {
 //        uint8_t N : 1;
 
 void Cpu::print_debug_info() const {
-    std::cout << "REGISTERS:\n";
-    printf("A:  %X\t(%d)\n", A, A);
-    printf("X:  %X\t(%d)\n", X, X);
-    printf("Y:  %X\t(%d)\n", Y, Y);
-    printf("PC: %X\t(%d)\n", PC, PC);
-    std::cout << "PS FLAGS:\n";
-    printf("C: %d\n", PS.C);
-    printf("Z: %d\n", PS.Z);
-    printf("I: %d\n", PS.I);
-    printf("D: %d\n", PS.D);
-    printf("B: %d\n", PS.B);
-    printf("V: %d\n", PS.V);
-    printf("N: %d\n", PS.N);
+    // std::cout << "REGISTERS:\n";
+    // printf("A:  %X\t(%d)\n", A, A);
+    // printf("X:  %X\t(%d)\n", X, X);
+    // printf("Y:  %X\t(%d)\n", Y, Y);
+    // printf("PC: %X\t(%d)\n", PC, PC);
+    // std::cout << "PS FLAGS:\n";
+    // printf("C: %d\n", PS.C);
+    // printf("Z: %d\n", PS.Z);
+    // printf("I: %d\n", PS.I);
+    // printf("D: %d\n", PS.D);
+    // printf("B: %d\n", PS.B);
+    // printf("V: %d\n", PS.V);
+    // printf("N: %d\n", PS.N);
 }
 
 

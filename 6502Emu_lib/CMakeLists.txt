@@ -12,3 +12,4 @@ set(SOURCE_FILES
         mem.cpp)
 
 add_library(6502Emu_lib STATIC ${SOURCE_FILES} ${HEADER_FILES})
+target_link_libraries(6502Emu_lib fmt::fmt)

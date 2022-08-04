@@ -11,29 +11,63 @@
 #ifndef INSTRUCTION
 #define INSTRUCTION
 
+#define ENABLE_INSTRUCTION_DEBUG_INFO 1
+
+
 struct Instruction{
     instruction_function<Cpu&> func; /// function that takes in references to Cpu and Mem. Returns number of cycles taken to run.
+    #if ENABLE_INSTRUCTION_DEBUG_INFO
     std::string id;
+    uint8_t opcode;     
+    AddressingMode mode;
 
-    Instruction():func(nullptr),id("unknown"){}
-    Instruction(instruction_function<Cpu&> func, std::string id):func(std::move(func)),id(std::move(id)){}
+    Instruction() = default;
+    Instruction(instruction_function<Cpu&> func, std::string id, uint8_t opcode, AddressingMode mode):
+        func(std::move(func)),id(std::move(id)),opcode(opcode),mode(mode){}
+    #else
+
+    Instruction(instruction_function<Cpu&> func)
+    #endif
+
 
     auto run(Cpu& cpu) const -> cycles{
         return func(cpu);
     }
+
+    std::string to_string() const;
+    AddressingMode addr_mode() const;
 };
 
 struct InstructionTable{
 private:
+    // template<int N>
+    // auto create_instructions(const int (&codes)[N], const instruction_function<Cpu&> (&funcs)[N], std::string name){
+    //     for (int i = 0; i < N; i++){
+    //         #if ENABLE_INSTRUCTION_DEBUG_INFO
+    //         table[codes[i]] = Instruction(funcs[i], name, codes[i]);
+    //         #else
+    //         table[codes[i]] = Instruction(funcs[i]);
+    //         #endif
+    //     }
+    // }
+
     template<int N>
-    auto create_instructions(const int (&codes)[N], const instruction_function<Cpu&> (&funcs)[N], std::string name){
+    auto create_instructions(const int (&codes)[N], const instruction_function<Cpu&> (&funcs)[N], const AddressingMode (&addr_modes)[N], std::string name){
         for (int i = 0; i < N; i++){
-            table[codes[i]] = Instruction(funcs[i], name);
+            #if ENABLE_INSTRUCTION_DEBUG_INFO
+            table[codes[i]] = Instruction(funcs[i], name, codes[i], addr_modes[i]);
+            #else
+            table[codes[i]] = Instruction(funcs[i]);
+            #endif
         }
     }
 
-    auto create_instructions(const int code, const instruction_function<Cpu&> func, const std::string name){
-        table[code] = Instruction(func, name);
+    auto create_instructions(const int code, const instruction_function<Cpu&> func, const AddressingMode mode, const std::string name){
+        #if ENABLE_INSTRUCTION_DEBUG_INFO
+        table[code] = Instruction(func, name, code, mode);
+        #else
+        table[code] = Instruction(func);
+        #endif
     }
     std::array<Instruction, 0xFF> table;
 public:
@@ -46,7 +80,17 @@ public:
 
 };
 
+struct DecompiledInstruction {
+    Instruction instruction;
+    std::array<uint8_t, 3> raw;
+    std::size_t addr;
 
+    DecompiledInstruction(Instruction instruction, std::array<uint8_t, 3> raw) : 
+        instruction(std::move(instruction)),raw(std::move(raw)),addr(0){}
+    DecompiledInstruction(InstructionTable const& table, Mem const& memory, std::size_t addr);
+
+    std::string to_string() const;
+};
 
 namespace addressing{
 
@@ -163,7 +207,7 @@ namespace addressing{
                         if (GetEffectiveAddress)
                             return std::pair(temp, temp2);
                         return std::pair(cpu.memory.get(temp) | (cpu.memory.get(temp + 1) << 8), temp2);
-                    case ZERO_PAGE_XY:
+                    case ZERO_PAGE_X:
                         temp = cpu.memory.get(cpu.PC++); // zero-page address
                         temp = 0x00FF & (temp + cpu.X); // indexed zero-page address ( Adds X to $aaaa without carry )
                         if (GetEffectiveAddress) return std::pair(temp, false);
@@ -191,7 +235,7 @@ namespace addressing{
                         temp = cpu.memory.get(cpu.PC) | (cpu.memory.get(cpu.PC + 1) << 8);
                         temp = cpu.memory.get(temp) | (cpu.memory.get(temp + 1) << 8); // 16-bit address
                         return std::pair(temp, false); // Return addr -> addr.
-                    case ZERO_PAGE_XY:
+                    case ZERO_PAGE_Y:
                         temp = cpu.memory.get(cpu.PC++); // zero-page address
                         temp = 0x00FF & (temp + cpu.Y); // indexed zero-page address ( Adds Y to $aaaa without carry )
                         if (GetEffectiveAddress) return std::pair(temp, false);

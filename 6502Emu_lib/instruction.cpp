@@ -2,6 +2,8 @@
 #include <chrono>
 #include <iostream>
 #include <bit>
+#include <fmt/format.h>
+#include <fmt/color.h>
 
 
 
@@ -15,10 +17,97 @@ using namespace utils;
 
 /// END FLAG-SETTING MACROS
 
+
+std::string Instruction::to_string() const {
+    #if ENABLE_INSTRUCTION_DEBUG_INFO
+    AddressingMode addr_mode = addrmode_mask(opcode);
+    std::string addr_mode_str = (std::string[]){
+        "INDIRECT_X",
+        "ACC",
+        "ABS",
+        "INDIRECT",
+        "INDIRECT_Y",
+        "Z_PAGE",
+        "ABS_Y",
+        "ABS_X"
+    }[(int)addr_mode];
+    
+    return fmt::format("{} ({})", id, addr_mode_str);
+    #else
+    return "";
+    #endif
+}
+
+AddressingMode Instruction::addr_mode() const{
+    return addrmode_mask(opcode);
+}
+
+#define _D_FMT(args...) fmt::format("${:04X}: {} " args)
+#define D_FMT(_fmt, ...) _D_FMT(_fmt, addr, instruction.id __VA_OPT__(,) __VA_ARGS__)
+
+std::string DecompiledInstruction::to_string() const{
+    switch (instruction.mode) {
+        case INDIRECT_X:
+            return D_FMT("(${:02X},X)", raw[1]);
+        case ZERO_PAGE:
+            return D_FMT("${:02X}", raw[1]);
+        case IMMEDIATE:
+            return D_FMT("#${:02X}", raw[1]);
+        case ACCUMULATOR:
+        case IMPLIED:
+            return D_FMT("");
+        case ABSOLUTE:
+            return D_FMT("${:04X}", ((uint16_t)raw[1]) | ((uint16_t)raw[2] << 4));
+        case INDIRECT_Y:
+            return D_FMT("(${:02X}),Y", raw[1]);
+        case ZERO_PAGE_X:
+            return D_FMT("${:02X},X", raw[1]);
+        case ZERO_PAGE_Y:
+            return D_FMT("${:02X},Y", raw[1]);
+        case ABSOLUTE_X:
+            return D_FMT("${:04X},X", ((uint16_t)raw[1]) | ((uint16_t)raw[2] << 4));
+        case ABSOLUTE_Y:
+            return D_FMT("${:04X},Y", ((uint16_t)raw[1]) | ((uint16_t)raw[2] << 4));
+        case RELATIVE:
+            return D_FMT("[${:04X}]", addr + std::bit_cast<int8_t, uint8_t>(raw[1]));
+        default:
+            return D_FMT("???");
+        
+    }
+}
+
+DecompiledInstruction::DecompiledInstruction(InstructionTable const& table, Mem const& memory, std::size_t addr){
+    this->addr = addr;
+    instruction = table.get(memory.get(addr));
+    raw[0] = memory.get(addr);
+    switch (instruction.mode){
+        case ABSOLUTE:
+        case INDIRECT:
+        case ABSOLUTE_X:
+        case ABSOLUTE_Y:
+        raw[2] = memory.get(addr+2);
+        case INDIRECT_X:
+        case ZERO_PAGE:
+        case IMMEDIATE:
+        case INDIRECT_Y:
+        case ZERO_PAGE_X:
+        case ZERO_PAGE_Y:
+        case RELATIVE:
+            raw[1] = memory.get(addr+1);
+        case ACCUMULATOR:
+        case IMPLIED:
+            break;
+        default:
+            fmt::print(fmt::emphasis::bold | fmt::emphasis::italic | fmt::fg(fmt::color::red), 
+                "DecompiledInstruction Instatiation Error: Invalid instruction mode {} from {} at address {}\n", instruction.mode, instruction.id, addr);
+            abort();
+    }
+}
+
 /// ADC (Add with carry)
 template<AddressingMode mode>
 static cycles instructions::ADC(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<mode, 8>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},{2,3,4,4,4,4,6,5});
+    constexpr cycles cyc = get_cycles<mode, 8>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},{2,3,4,4,4,4,6,5});
     auto data = load_addr<mode, NORMAL_MODE>(cpu);
 
     if (cpu.PS.D) { // BCD
@@ -56,7 +145,7 @@ static cycles instructions::ADC(Cpu& cpu){
 /// AND (logical AND)
 template<AddressingMode Mode>
 static cycles instructions::AND(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y}, {2, 3, 4, 4, 4, 4, 6, 5});
+    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y}, {2, 3, 4, 4, 4, 4, 6, 5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     cpu.A &= data.first;
     CHECK_Z_FLAG(cpu.A);
@@ -67,7 +156,7 @@ static cycles instructions::AND(Cpu& cpu){
 /// ASL (Arithmetic Shift Left)
 template<AddressingMode Mode>
 static cycles instructions::ASL(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<Mode>({ACCUMULATOR, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X}, {2, 5, 6, 6, 7});
+    constexpr cycles cyc = get_cycles<Mode>({ACCUMULATOR, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X}, {2, 5, 6, 6, 7});
     std::pair<uint16_t, bool> data;
     uint16_t tmp;
     if (contains_modes<ACCUMULATOR>(Mode)){
@@ -139,7 +228,7 @@ static cycles instructions::FLAGSET(Cpu& cpu){
 
 template<AddressingMode Mode>
 static cycles instructions::CMP(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
+    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     cpu.PS.N = ((cpu.A - data.first) & 0x80) > 0;
@@ -166,7 +255,7 @@ static cycles instructions::CMP_REG(Cpu& cpu){
 
 template<AddressingMode Mode, bool IsIncrement>
 static cycles instructions::INCDEC_MEMORY(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<Mode>({ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X}, {5,6,6,7});
+    constexpr cycles cyc = get_cycles<Mode>({ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X}, {5,6,6,7});
     auto data = load_addr_ref<Mode, NORMAL_MODE>(cpu);
     uint8_t result = IsIncrement ?  cpu.memory.get(data.first)+1 : cpu.memory.get(data.first)-1;
     CHECK_Z_FLAG(result);
@@ -191,7 +280,7 @@ static cycles instructions::INCDEC_REG(Cpu& cpu){
 /// EOR (Exclusive OR)
 template<AddressingMode Mode>
 static cycles instructions::EOR(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
+    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     cpu.A ^= data.first;
@@ -221,7 +310,7 @@ static cycles instructions::JSR(Cpu& cpu){
 
 template<AddressingMode Mode>
 static cycles instructions::LDA(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
+    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     cpu.A = data.first;
@@ -232,7 +321,7 @@ static cycles instructions::LDA(Cpu& cpu){
 
 template<AddressingMode Mode, bool IsX, ModeType MMode>
 static cycles instructions::LOAD_REG(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y}, {2,3,4,4,4,4});
+    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ZERO_PAGE_Y, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y}, {2,3,4,4,4,4,4});
     auto data = load_addr<Mode, MMode>(cpu);
     uint8_t result;
     if (IsX){ // X Register
@@ -248,7 +337,7 @@ static cycles instructions::LOAD_REG(Cpu& cpu){
 template<AddressingMode Mode, Bitshift::Enum ShiftType>
 static cycles instructions::BITSHIFT(Cpu& cpu){
     uint16_t tmp;
-    constexpr cycles cyc = get_cycles<Mode>({ACCUMULATOR, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X}, {2,5,6,6,7});
+    constexpr cycles cyc = get_cycles<Mode>({ACCUMULATOR, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X}, {2,5,6,6,7});
     if (contains_modes<ACCUMULATOR>(Mode)){
         switch (ShiftType){
             case Bitshift::ROTATE_LEFT:
@@ -306,7 +395,7 @@ static cycles instructions::NOP(Cpu& cpu){
 /// ORA (Logical Inclusive OR)
 template<AddressingMode Mode>
 static cycles instructions::ORA(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
+    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
     cpu.A |= data.first;
@@ -359,7 +448,7 @@ static cycles instructions::RTS(Cpu& cpu){
 /// SBC (Subtract with Carry)
 template<AddressingMode Mode>
 static cycles instructions::SBC(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
+    constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
 
@@ -394,7 +483,7 @@ static cycles instructions::SBC(Cpu& cpu){
 
 template<AddressingMode Mode, Register::Enum Reg>
 static cycles instructions::STORE_REG(Cpu& cpu){
-    constexpr cycles cyc = get_cycles<Mode>({ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y}, {3,4,4,5,5,6,6});
+    constexpr cycles cyc = get_cycles<Mode>({ZERO_PAGE, ZERO_PAGE_X, ZERO_PAGE_Y, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y}, {3,4,4,4,5,5,6,6});
     auto data = load_addr_ref<Mode, NORMAL_MODE>(cpu);
     switch (Reg){
         case Register::A:
@@ -473,216 +562,257 @@ InstructionTable::InstructionTable(){
     using namespace instructions;
     auto time_begin = std::chrono::steady_clock::now();
 
+    static auto invalid_instr = [](Cpu& cpu)->cycles{
+        std::cerr << "INVALID INSTRUCTION AT " << std::hex << (int)cpu.PC << "\n";
+        return 0;
+    };
+    
+    for (auto& entry : table) {
+        #if ENABLE_INSTRUCTION_DEBUG_INFO
+        entry = Instruction(invalid_instr, "???", 0xFF, ACCUMULATOR);
+        #else
+        entry = Instruction(invalid_instr);
+        #endif
+    }
+
     /// ADC
     create_instructions(
             {0x69, 0x65, 0x75, 0x6D, 0x7D, 0x79, 0x61, 0x71},
-            {ADC<IMMEDIATE>, ADC<ZERO_PAGE>, ADC<ZERO_PAGE_XY>, ADC<ABSOLUTE>, ADC<ABSOLUTE_X>, ADC<ABSOLUTE_Y>, ADC<INDIRECT_X>, ADC<INDIRECT_Y>},
+            {ADC<IMMEDIATE>, ADC<ZERO_PAGE>, ADC<ZERO_PAGE_X>, ADC<ABSOLUTE>, ADC<ABSOLUTE_X>, ADC<ABSOLUTE_Y>, ADC<INDIRECT_X>, ADC<INDIRECT_Y>},
+            {IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
             "ADC");
     /// AND
     create_instructions({0x29, 0x25, 0x35, 0x2D, 0x3D, 0x39, 0x21, 0x31},
-                           {AND<IMMEDIATE>, AND<ZERO_PAGE>, AND<ZERO_PAGE_XY>, AND<ABSOLUTE>, AND<ABSOLUTE_X>, AND<ABSOLUTE_Y>, AND<INDIRECT_X>, AND<INDIRECT_Y>},
+                           {AND<IMMEDIATE>, AND<ZERO_PAGE>, AND<ZERO_PAGE_X>, AND<ABSOLUTE>, AND<ABSOLUTE_X>, AND<ABSOLUTE_Y>, AND<INDIRECT_X>, AND<INDIRECT_Y>},
+                           {IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                            "AND");
     /// ASL
     create_instructions({0x0A, 0x06, 0x16, 0x0E, 0x1E},
-                        {ASL<ACCUMULATOR>, ASL<ZERO_PAGE>, ASL<ZERO_PAGE_XY>, ASL<ABSOLUTE>, ASL<ABSOLUTE_X>},
+                        {ASL<ACCUMULATOR>, ASL<ZERO_PAGE>, ASL<ZERO_PAGE_X>, ASL<ABSOLUTE>, ASL<ABSOLUTE_X>},
+                        {ACCUMULATOR, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X},
                         "ASL");
 
     
     /// BCC
     //CREATE_INSTRUCTION(0x90, BRANCH<CARRY_FLAG, false>, "BCC");
-    create_instructions({0x90}, {BRANCH<CARRY_FLAG, false>}, "BCC");
+    create_instructions({0x90}, {BRANCH<CARRY_FLAG, false>}, {RELATIVE}, "BCC");
 
     /// BCS
     //CREATE_INSTRUCTION(0xB0, BRANCH<CARRY_FLAG, true>, "BCS");
-    create_instructions({0xB0}, {BRANCH<CARRY_FLAG, true>}, "BCS");
+    create_instructions({0xB0}, {BRANCH<CARRY_FLAG, true>}, {RELATIVE}, "BCS");
 
     /// BEQ
     //CREATE_INSTRUCTION(0xF0, BRANCH<ZERO_FLAG, true>, "BEQ");
-    create_instructions({0xF0}, {BRANCH<ZERO_FLAG, true>}, "BEQ");
+    create_instructions({0xF0}, {BRANCH<ZERO_FLAG, true>}, {RELATIVE}, "BEQ");
 
     /// BIT
-    create_instructions({0x24, 0x2C}, {BIT<ZERO_PAGE>, BIT<ABSOLUTE>}, "BIT");
+    create_instructions({0x24, 0x2C}, {BIT<ZERO_PAGE>, BIT<ABSOLUTE>}, {ZERO_PAGE, ABSOLUTE}, "BIT");
 
     /// BMI
-    create_instructions({0x30}, {BRANCH<NEGATIVE_FLAG, true>}, "BMI");
+    create_instructions({0x30}, {BRANCH<NEGATIVE_FLAG, true>}, {RELATIVE}, "BMI");
 
     /// BNE
-    create_instructions({0xD0}, {BRANCH<ZERO_FLAG, false>}, "BNE");
+    create_instructions({0xD0}, {BRANCH<ZERO_FLAG, false>}, {RELATIVE}, "BNE");
 
     /// BPL
-    create_instructions({0x10}, {BRANCH<NEGATIVE_FLAG, false>}, "BPL");
+    create_instructions({0x10}, {BRANCH<NEGATIVE_FLAG, false>}, {RELATIVE}, "BPL");
 
     /// BRK
-    create_instructions({0x00}, {BRK}, "BRK");
+    create_instructions({0x00}, {BRK}, {IMPLIED}, "BRK");
 
     /// BVC (Branch if Overflow Clear)
-    create_instructions({0x50}, {BRANCH<OVERFLOW_FLAG, false>}, "BVC");
+    create_instructions({0x50}, {BRANCH<OVERFLOW_FLAG, false>}, {RELATIVE}, "BVC");
 
     /// BVS (Branch if Overflow Set)
-    create_instructions({0x70}, {BRANCH<OVERFLOW_FLAG, true>}, "BVS");
+    create_instructions({0x70}, {BRANCH<OVERFLOW_FLAG, true>}, {RELATIVE}, "BVS");
 
     /// CLC (Clear Carry Flag)
-    create_instructions({0x18}, {FLAGSET<CARRY_FLAG, false>}, "CLC");
+    create_instructions({0x18}, {FLAGSET<CARRY_FLAG, false>}, {IMPLIED}, "CLC");
 
     /// CLD (Clear Decimal Mode)
-    create_instructions({0xD8}, {FLAGSET<DECIMAL_FLAG, false>}, "CLD");
+    create_instructions({0xD8}, {FLAGSET<DECIMAL_FLAG, false>}, {IMPLIED}, "CLD");
 
     /// CLI (Clear Interrupt Disable)
-    create_instructions({0x58}, {FLAGSET<INTERRUPT_DISABLE_FLAG, false>}, "CLI");
+    create_instructions({0x58}, {FLAGSET<INTERRUPT_DISABLE_FLAG, false>}, {IMPLIED}, "CLI");
 
     /// CLV (Clear Overflow Flag)
-    create_instructions({0xB8}, {FLAGSET<OVERFLOW_FLAG, false>}, "CLV");
+    create_instructions({0xB8}, {FLAGSET<OVERFLOW_FLAG, false>}, {IMPLIED}, "CLV");
 
     /// CMP (Compare Accumulator)
     create_instructions({0xC9, 0xC5, 0xD5, 0xCD, 0xDD, 0xD9, 0xC1, 0xD1},
-                        {CMP<IMMEDIATE>, CMP<ZERO_PAGE>, CMP<ZERO_PAGE_XY>, CMP<ABSOLUTE>, CMP<ABSOLUTE_X>, CMP<ABSOLUTE_Y>, CMP<INDIRECT_X>, CMP<INDIRECT_Y>},
+                        {CMP<IMMEDIATE>, CMP<ZERO_PAGE>, CMP<ZERO_PAGE_X>, CMP<ABSOLUTE>, CMP<ABSOLUTE_X>, CMP<ABSOLUTE_Y>, CMP<INDIRECT_X>, CMP<INDIRECT_Y>},
+                        {IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                         "CMP");
 
     /// CPX (Compare X Register)
-    create_instructions({0xE0, 0xE4, 0xEC}, {CMP_REG<IMMEDIATE, true>, CMP_REG<ZERO_PAGE, true>, CMP_REG<ABSOLUTE, true>}, "CPX");
+    create_instructions({0xE0, 0xE4, 0xEC}, 
+                        {CMP_REG<IMMEDIATE, true>, CMP_REG<ZERO_PAGE, true>, CMP_REG<ABSOLUTE, true>}, 
+                        {IMMEDIATE, ZERO_PAGE, ABSOLUTE}, 
+                        "CPX");
 
     /// CPY (Compare Y Register
-    create_instructions({0xC0, 0xC4, 0xCC}, {CMP_REG<IMMEDIATE, false>, CMP_REG<ZERO_PAGE, false>, CMP_REG<ABSOLUTE, false>}, "CPY");
+    create_instructions({0xC0, 0xC4, 0xCC}, 
+                        {CMP_REG<IMMEDIATE, false>, CMP_REG<ZERO_PAGE, false>, CMP_REG<ABSOLUTE, false>}, 
+                        {IMMEDIATE, ZERO_PAGE, ABSOLUTE},
+                        "CPY");
 
     /// DEC (Decrement Memory)
     create_instructions( {0xC6, 0xD6, 0xCE, 0xDE},
-                         {INCDEC_MEMORY<ZERO_PAGE, false>, INCDEC_MEMORY<ZERO_PAGE_XY, false>, INCDEC_MEMORY<ABSOLUTE, false>, INCDEC_MEMORY<ABSOLUTE_X, false>},
+                         {INCDEC_MEMORY<ZERO_PAGE, false>, INCDEC_MEMORY<ZERO_PAGE_X, false>, INCDEC_MEMORY<ABSOLUTE, false>, INCDEC_MEMORY<ABSOLUTE_X, false>},
+                         {ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X},
                          "DEC");
 
     /// DEX (Decrement X Register)
-    create_instructions({0xCA}, {INCDEC_REG<true, false>}, "DEX");
+    create_instructions({0xCA}, {INCDEC_REG<true, false>}, {IMPLIED}, "DEX");
 
     /// DEY (Decrement Y Register)
-    create_instructions({0x88}, {INCDEC_REG<false, false>}, "DEY");
+    create_instructions({0x88}, {INCDEC_REG<false, false>}, {IMPLIED}, "DEY");
 
     /// EOR (Exclusive OR)
     create_instructions({0x49, 0x45, 0x55, 0x4D, 0x5D, 0x59, 0x41, 0x51},
-                        {EOR<IMMEDIATE>, EOR<ZERO_PAGE>, EOR<ZERO_PAGE_XY>, EOR<ABSOLUTE>, EOR<ABSOLUTE_X>, EOR<ABSOLUTE_Y>, EOR<INDIRECT_X>, EOR<INDIRECT_Y>},
+                        {EOR<IMMEDIATE>, EOR<ZERO_PAGE>, EOR<ZERO_PAGE_X>, EOR<ABSOLUTE>, EOR<ABSOLUTE_X>, EOR<ABSOLUTE_Y>, EOR<INDIRECT_X>, EOR<INDIRECT_Y>},
+                        {IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                         "EOR");
 
     /// INC (Increment Memory)
-    create_instructions({0xE6, 0xF6, 0xEE, 0xFE}, {INCDEC_MEMORY<ZERO_PAGE, true>, INCDEC_MEMORY<ZERO_PAGE_XY, true>, INCDEC_MEMORY<ABSOLUTE, true>, INCDEC_MEMORY<ABSOLUTE_X, true>},
+    create_instructions({0xE6, 0xF6, 0xEE, 0xFE}, 
+                        {INCDEC_MEMORY<ZERO_PAGE, true>, INCDEC_MEMORY<ZERO_PAGE_X, true>, INCDEC_MEMORY<ABSOLUTE, true>, INCDEC_MEMORY<ABSOLUTE_X, true>},
+                        {ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X},
                         "INC");
 
     /// INX (Increment X Register)
-    create_instructions({0xE8}, {INCDEC_REG<true, true>}, "INX");
+    create_instructions({0xE8}, {INCDEC_REG<true, true>}, {IMPLIED}, "INX");
 
     /// INY (Increment Y Register)
-    create_instructions({0xC8}, {INCDEC_REG<false, true>}, "INY");
+    create_instructions({0xC8}, {INCDEC_REG<false, true>}, {IMPLIED}, "INY");
 
     /// JMP (Jump)
-    create_instructions({0x4C, 0x6C}, {JMP<ABSOLUTE, NORMAL_MODE>, JMP<INDIRECT, ALTERNATIVE_MODE>}, "JMP");
+    create_instructions({0x4C, 0x6C}, 
+                        {JMP<ABSOLUTE, NORMAL_MODE>, JMP<INDIRECT, ALTERNATIVE_MODE>},
+                        {ABSOLUTE, INDIRECT},
+                        "JMP");
 
     /// JSR (Jump to Subroutine)
-    create_instructions({0x20}, {JSR<ABSOLUTE>}, "JSR");
+    create_instructions({0x20}, {JSR<ABSOLUTE>}, {ABSOLUTE}, "JSR");
 
     /// LDA (Load Accumulator)
     create_instructions({0xA9, 0xA5, 0xB5, 0xAD, 0xBD, 0xB9, 0xA1, 0xB1},
-                        {LDA<IMMEDIATE>, LDA<ZERO_PAGE>, LDA<ZERO_PAGE_XY>, LDA<ABSOLUTE>, LDA<ABSOLUTE_X>, LDA<ABSOLUTE_Y>, LDA<INDIRECT_X>, LDA<INDIRECT_Y>},
+                        {LDA<IMMEDIATE>, LDA<ZERO_PAGE>, LDA<ZERO_PAGE_X>, LDA<ABSOLUTE>, LDA<ABSOLUTE_X>, LDA<ABSOLUTE_Y>, LDA<INDIRECT_X>, LDA<INDIRECT_Y>},
+                        {IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                         "LDA");
 
     /// LDX (Load X Register)
     create_instructions({0xA2, 0xA6, 0xB6, 0xAE, 0xBE},
-                        {LOAD_REG<IMMEDIATE, true>, LOAD_REG<ZERO_PAGE, true>, LOAD_REG<ZERO_PAGE_XY, true, ALTERNATIVE_MODE>, LOAD_REG<ABSOLUTE, true>, LOAD_REG<ABSOLUTE_Y, true>},
+                        {LOAD_REG<IMMEDIATE, true>, LOAD_REG<ZERO_PAGE, true>, LOAD_REG<ZERO_PAGE_Y, true, ALTERNATIVE_MODE>, LOAD_REG<ABSOLUTE, true>, LOAD_REG<ABSOLUTE_Y, true>},
+                        {IMMEDIATE, ZERO_PAGE, ZERO_PAGE_Y, ABSOLUTE, ABSOLUTE_Y},
                         "LDX");
 
     /// LDY (Load Y Register)
     create_instructions({0xA0, 0xA4, 0xB4, 0xAC, 0xBC},
-                        {LOAD_REG<IMMEDIATE, false>, LOAD_REG<ZERO_PAGE, false>, LOAD_REG<ZERO_PAGE_XY, false>, LOAD_REG<ABSOLUTE, false>, LOAD_REG<ABSOLUTE_X, false>},
+                        {LOAD_REG<IMMEDIATE, false>, LOAD_REG<ZERO_PAGE, false>, LOAD_REG<ZERO_PAGE_X, false>, LOAD_REG<ABSOLUTE, false>, LOAD_REG<ABSOLUTE_X, false>},
+                        {IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X},
                         "LDY");
 
     /// LSR (Logical Shift Right)
     create_instructions({0x4A, 0x46, 0x56, 0x4E, 0x5E},
-                        {BITSHIFT<ACCUMULATOR, Bitshift::SHIFT_RIGHT>, BITSHIFT<ZERO_PAGE, Bitshift::SHIFT_RIGHT>, BITSHIFT<ZERO_PAGE_XY, Bitshift::SHIFT_RIGHT>,
+                        {BITSHIFT<ACCUMULATOR, Bitshift::SHIFT_RIGHT>, BITSHIFT<ZERO_PAGE, Bitshift::SHIFT_RIGHT>, BITSHIFT<ZERO_PAGE_X, Bitshift::SHIFT_RIGHT>,
                                 BITSHIFT<ABSOLUTE, Bitshift::SHIFT_RIGHT>, BITSHIFT<ABSOLUTE_X, Bitshift::SHIFT_RIGHT>},
-                                "LSR");
+                        {ACCUMULATOR, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X},
+                        "LSR");
 
     /// NOP (No Operation)
-    create_instructions({0xEA}, {NOP}, "NOP");
+    create_instructions({0xEA}, {NOP}, {IMPLIED}, "NOP");
 
     /// ORA (Logical Inclusive OR)
     create_instructions({0x09, 0x05, 0x15, 0x0D, 0x1D, 0x19, 0x01, 0x11},
-                        {ORA<IMMEDIATE>, ORA<ZERO_PAGE>, ORA<ZERO_PAGE_XY>, ORA<ABSOLUTE>, ORA<ABSOLUTE_X>, ORA<ABSOLUTE_Y>, ORA<INDIRECT_X>, ORA<INDIRECT_Y>},
+                        {ORA<IMMEDIATE>, ORA<ZERO_PAGE>, ORA<ZERO_PAGE_X>, ORA<ABSOLUTE>, ORA<ABSOLUTE_X>, ORA<ABSOLUTE_Y>, ORA<INDIRECT_X>, ORA<INDIRECT_Y>},
+                        {IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                         "ORA");
 
     /// PHA (Push Accumulator)
-    create_instructions({0x48}, {PUSH_REG<true>}, "PHA");
+    create_instructions({0x48}, {PUSH_REG<true>}, {IMPLIED}, "PHA");
 
     /// PHP (Push Processor Status)
-    create_instructions({0x08}, {PUSH_REG<false>}, "PHP");
+    create_instructions({0x08}, {PUSH_REG<false>}, {IMPLIED}, "PHP");
 
     /// PLA (Pull Accumulator)
-    create_instructions({0x68}, {PULL_REG<true>}, "PLA");
+    create_instructions({0x68}, {PULL_REG<true>}, {IMPLIED}, "PLA");
 
     /// PLP (Pull Processor Status)
-    create_instructions({0x28}, {PULL_REG<false>}, "PLP");
+    create_instructions({0x28}, {PULL_REG<false>}, {IMPLIED}, "PLP");
 
     /// ROL (Rotate Left)
     create_instructions({0x2A, 0x26, 0x36, 0x2E, 0x3E},
-                        {BITSHIFT<ACCUMULATOR, Bitshift::ROTATE_LEFT>, BITSHIFT<ZERO_PAGE, Bitshift::ROTATE_LEFT>, BITSHIFT<ZERO_PAGE_XY, Bitshift::ROTATE_LEFT>,
+                        {BITSHIFT<ACCUMULATOR, Bitshift::ROTATE_LEFT>, BITSHIFT<ZERO_PAGE, Bitshift::ROTATE_LEFT>, BITSHIFT<ZERO_PAGE_X, Bitshift::ROTATE_LEFT>,
                          BITSHIFT<ABSOLUTE, Bitshift::ROTATE_LEFT>, BITSHIFT<ABSOLUTE_X, Bitshift::ROTATE_LEFT>},
-                         "ROL");
+                        {ACCUMULATOR, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X},
+                        "ROL");
 
     /// ROR (Rotate Right)
     create_instructions({0x6A, 0x66, 0x76, 0x6E, 0x7E},
-                        {BITSHIFT<ACCUMULATOR, Bitshift::ROTATE_RIGHT>, BITSHIFT<ZERO_PAGE, Bitshift::ROTATE_RIGHT>, BITSHIFT<ZERO_PAGE_XY, Bitshift::ROTATE_RIGHT>,
+                        {BITSHIFT<ACCUMULATOR, Bitshift::ROTATE_RIGHT>, BITSHIFT<ZERO_PAGE, Bitshift::ROTATE_RIGHT>, BITSHIFT<ZERO_PAGE_X, Bitshift::ROTATE_RIGHT>,
                          BITSHIFT<ABSOLUTE, Bitshift::ROTATE_RIGHT>, BITSHIFT<ABSOLUTE_X, Bitshift::ROTATE_RIGHT>},
-                         "ROR");
+                        {ACCUMULATOR, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X},
+                        "ROR");
 
     /// RTI (Return from Interrupt)
-    create_instructions({0x40}, {RTI}, "RTI");
+    create_instructions({0x40}, {RTI}, {IMPLIED}, "RTI");
 
     /// RTS (Return from Subroutine)
-    create_instructions({0x60}, {RTS}, "RTS");
+    create_instructions({0x60}, {RTS}, {IMPLIED}, "RTS");
 
     // SBC (Subtract with Carry)
     create_instructions({0xE9, 0xE5, 0xF5, 0xED, 0xFD, 0xF9, 0xE1, 0xF1},
-                        {SBC<IMMEDIATE>, SBC<ZERO_PAGE>, SBC<ZERO_PAGE_XY>, SBC<ABSOLUTE>, SBC<ABSOLUTE_X>, SBC<ABSOLUTE_Y>, SBC<INDIRECT_X>, SBC<INDIRECT_Y>},
+                        {SBC<IMMEDIATE>, SBC<ZERO_PAGE>, SBC<ZERO_PAGE_X>, SBC<ABSOLUTE>, SBC<ABSOLUTE_X>, SBC<ABSOLUTE_Y>, SBC<INDIRECT_X>, SBC<INDIRECT_Y>},
+                        {IMMEDIATE, ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                         "SBC");
 
     /// SEC (Set Carry Flag)
-    create_instructions({0x38}, {FLAGSET<CARRY_FLAG, true>}, "SEC");
+    create_instructions({0x38}, {FLAGSET<CARRY_FLAG, true>}, {IMPLIED}, "SEC");
 
     /// SED (Set Decimal Flag)
-    create_instructions({0xF8}, {FLAGSET<DECIMAL_FLAG, true>}, "SED");
+    create_instructions({0xF8}, {FLAGSET<DECIMAL_FLAG, true>}, {IMPLIED}, "SED");
 
     /// SEI (Set Interrupt Disable)
-    create_instructions({0x78}, {FLAGSET<INTERRUPT_DISABLE_FLAG, true>}, "SEI");
+    create_instructions({0x78}, {FLAGSET<INTERRUPT_DISABLE_FLAG, true>}, {IMPLIED}, "SEI");
 
     /// STA (Store Accumulator)
     create_instructions({0x85, 0x95, 0x8D, 0x9D, 0x99, 0x81, 0x91},
-                        {STORE_REG<ZERO_PAGE, Register::A>, STORE_REG<ZERO_PAGE_XY, Register::A>, STORE_REG<ABSOLUTE, Register::A>,
+                        {STORE_REG<ZERO_PAGE, Register::A>, STORE_REG<ZERO_PAGE_X, Register::A>, STORE_REG<ABSOLUTE, Register::A>,
                         STORE_REG<ABSOLUTE_X, Register::A>, STORE_REG<ABSOLUTE_Y, Register::A>, STORE_REG<INDIRECT_X, Register::A>,
                         STORE_REG<INDIRECT_Y, Register::A>},
+                        {ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                         "STA");
 
     /// STX (Store X Register)
     create_instructions({0x86, 0x96, 0x8E},
-                        {STORE_REG<ZERO_PAGE, Register::X>, STORE_REG<ZERO_PAGE_XY, Register::X>, STORE_REG<ABSOLUTE, Register::X>},
+                        {STORE_REG<ZERO_PAGE, Register::X>, STORE_REG<ZERO_PAGE_Y, Register::X>, STORE_REG<ABSOLUTE, Register::X>},
+                        {ZERO_PAGE, ZERO_PAGE_Y, ABSOLUTE},
                         "STX");
 
     /// STY (Store Y Register)
     create_instructions({0x84, 0x94, 0x8C},
-                        {STORE_REG<ZERO_PAGE, Register::Y>, STORE_REG<ZERO_PAGE_XY, Register::Y>, STORE_REG<ABSOLUTE, Register::Y>},
+                        {STORE_REG<ZERO_PAGE, Register::Y>, STORE_REG<ZERO_PAGE_X, Register::Y>, STORE_REG<ABSOLUTE, Register::Y>},
+                        {ZERO_PAGE, ZERO_PAGE_X, ABSOLUTE},
                         "STY");
 
     /// TAX (Transfer Accumulator to X)
-    create_instructions({0xAA}, {TRANSFER_REG<Register::A, Register::X>}, "TAX");
+    create_instructions({0xAA}, {TRANSFER_REG<Register::A, Register::X>}, {IMPLIED}, "TAX");
 
     /// TAY (Transfer Accumulator to Y)
-    create_instructions({0xA8}, {TRANSFER_REG<Register::A, Register::Y>}, "TAY");
+    create_instructions({0xA8}, {TRANSFER_REG<Register::A, Register::Y>}, {IMPLIED}, "TAY");
 
     /// TSX (Transfer Stack Pointer to X)
-    create_instructions({0xBA}, {TRANSFER_REG<Register::SP, Register::X>}, "TSX");
+    create_instructions({0xBA}, {TRANSFER_REG<Register::SP, Register::X>}, {IMPLIED}, "TSX");
 
     /// TXA (Transfer X to Accumulator)
-    create_instructions({0x8A}, {TRANSFER_REG<Register::X, Register::A>}, "TXA");
+    create_instructions({0x8A}, {TRANSFER_REG<Register::X, Register::A>}, {IMPLIED}, "TXA");
 
     /// TXS (Transfer X to Stack Pointer)
-    create_instructions({0x9A}, {TRANSFER_REG<Register::X, Register::SP>}, "TXS");
+    create_instructions({0x9A}, {TRANSFER_REG<Register::X, Register::SP>}, {IMPLIED}, "TXS");
 
     /// TYA (Transfer Y to Accumulator)
-    create_instructions({0x98}, {TRANSFER_REG<Register::Y, Register::A>}, "TYA");
+    create_instructions({0x98}, {TRANSFER_REG<Register::Y, Register::A>}, {IMPLIED}, "TYA");
 
     auto time_end = std::chrono::steady_clock::now();
     std::cout << "InstructionTable Initialization Completed in " << std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count() << " microseconds.\n";

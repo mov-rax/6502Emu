@@ -11,16 +11,19 @@ template<typename T>
 using instruction_function = std::function<cycles(T)>;
 
 enum AddressingMode{
-    INDIRECT_X      = 0,
-    ZERO_PAGE       = 1 << 2,
-    IMMEDIATE       = 2 << 2,
-    ACCUMULATOR     = 2 << 2,
-    ABSOLUTE        = 3 << 2,
-    INDIRECT        = 3 << 2, // Used exclusively in JMP
-    INDIRECT_Y      = 4 << 2,
-    ZERO_PAGE_XY    = 5 << 2,
-    ABSOLUTE_Y      = 6 << 2,
-    ABSOLUTE_X      = 7 << 2,
+    INDIRECT_X,
+    ZERO_PAGE,
+    IMMEDIATE,
+    ACCUMULATOR,
+    ABSOLUTE,
+    INDIRECT, // Used exclusively in JMP
+    INDIRECT_Y ,
+    ZERO_PAGE_X,
+    ZERO_PAGE_Y,
+    ABSOLUTE_Y,
+    ABSOLUTE_X,
+    RELATIVE,
+    IMPLIED,       
 };
 
 enum PSFlagType{
