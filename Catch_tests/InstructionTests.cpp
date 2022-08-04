@@ -319,3 +319,66 @@ TEST_CASE("BCD Addition Tests", "[InstructionTests]") {
     REQUIRE(cpu.PS.V == 0);
     REQUIRE(cpu.PS.N == 0);
 }
+
+TEST_CASE("Subtraction Tests", "[InstructionTests]") {
+    Cpu cpu;
+    cpu.program_write({0xa9, 0x10, 0xe9, 0x10, 0xe9, 0x01, 0xe9, 0x20, 0xe9, 0x78 });
+    cpu.execute_instruction(); // LDA #$10
+    REQUIRE(cpu.A == 0x10);
+    cpu.execute_instruction(); // SBC #$10
+    REQUIRE(cpu.A == 0xFF);
+    REQUIRE(cpu.PS.N == 1);
+    REQUIRE(cpu.PS.V == 0);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 0);
+    cpu.execute_instruction(); // SBC #$01
+    REQUIRE(cpu.A == 0xFD);
+    REQUIRE(cpu.PS.N == 1);
+    REQUIRE(cpu.PS.V == 0);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 1);
+    cpu.execute_instruction(); // SBC #$20
+    REQUIRE(cpu.A == 0xDD);
+    REQUIRE(cpu.PS.N == 1);
+    REQUIRE(cpu.PS.V == 0);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 1);
+    cpu.execute_instruction(); // SBC #$78
+    REQUIRE(cpu.A == 0x65);
+    REQUIRE(cpu.PS.N == 0);
+    REQUIRE(cpu.PS.V == 1);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 1);
+}
+
+TEST_CASE("BCD Subtraction Tests", "[InstructionTests]") {
+    Cpu cpu;
+    cpu.program_write({0xf8, 0x38, 0xa9, 0x10, 0xe9, 0x10, 0xe9, 0x01, 0xe9, 0x20, 0xe9, 0x78});
+    cpu.execute_instruction(); // SED
+    REQUIRE(cpu.PS.D == 1);
+    cpu.execute_instruction(); // SEC
+    REQUIRE(cpu.PS.C == 1);
+    cpu.execute_instruction(); // LDA #$10
+    REQUIRE(cpu.A == 0x10);
+    cpu.execute_instruction(); // SBC #$10
+    REQUIRE(cpu.A == 0);
+    REQUIRE(cpu.PS.Z == 1);
+    REQUIRE(cpu.PS.C == 1);
+    cpu.execute_instruction(); // SBC #$01
+    REQUIRE(cpu.A == 0x99);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 0);
+    REQUIRE(cpu.PS.N == 1);
+    cpu.execute_instruction(); // SBC #$20
+    REQUIRE(cpu.A == 0x78);
+    REQUIRE(cpu.PS.Z == 0);
+    REQUIRE(cpu.PS.C == 1);
+    REQUIRE(cpu.PS.N == 0);
+    REQUIRE(cpu.PS.V == 1);
+    cpu.execute_instruction(); // SBC #$78
+    REQUIRE(cpu.A == 0);
+    REQUIRE(cpu.PS.Z == 1);
+    REQUIRE(cpu.PS.C == 1);
+    REQUIRE(cpu.PS.N == 0);
+    REQUIRE(cpu.PS.V == 0);
+}

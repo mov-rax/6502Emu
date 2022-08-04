@@ -15,50 +15,32 @@ using namespace utils;
 
 /// END FLAG-SETTING MACROS
 
-/// BEGIN LOCAL FUNCTIONS FOR INTEGER/BCD CONVERSION
-uint8_t conv_to_bcd(uint8_t n) {
-    uint64_t bcd = n;
-    for (int i = 0; i < 32; ++i) {
-        for (int j = 0; j < 32; j += 4) {
-            if (((bcd >> (32 + j)) & 0x0000000F) > 4) {
-                bcd += ((uint64_t)3 << (32 + j));
-            }
-        }
-        bcd <<= 1;
-    }
-    bcd >>= 32;
-    return (uint8_t)bcd;
-}
-
-/// Converts a binary-coded decimal to an integer.
-uint8_t conv_to_int(uint8_t bcd_data){
-    return (((bcd_data & 0b11110000) >> 4) * 10) + (bcd_data & 0b00001111);
-}
-
-/// END LOCAL FUNCTIONS FOR INTEGER/BCD CONVERSION
-
-
 /// ADC (Add with carry)
 template<AddressingMode mode>
 static cycles instructions::ADC(Cpu& cpu){
     constexpr cycles cyc = get_cycles<mode, 8>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},{2,3,4,4,4,4,6,5});
     auto data = load_addr<mode, NORMAL_MODE>(cpu);
 
-    if (cpu.PS.D) { // BCD (NOT YET IMPLEMENTED
-        uint8_t number = conv_to_int(data.first);
-        uint16_t result = (uint16_t)conv_to_int(cpu.A) + (uint16_t)number + (uint16_t)cpu.PS.C;
-        // Ensure that value is BCD 0 to 99.
-        // if (result & 0x80) { // is negative
-        //     cpu.A = conv_to_bcd((~result + 1) % 100); // 2's complement
-        // } else {
-        //     cpu.A = conv_to_bcd(result % 100);
-        // }
-        uint16_t trimmed_result = result % 100;
-        cpu.A = conv_to_bcd(trimmed_result);
-        cpu.PS.C = (result >= 100);
+    if (cpu.PS.D) { // BCD
+        uint8_t lower = (uint8_t)(data.first & 0x0F) + (cpu.A & 0x0F) + cpu.PS.C;
+        if (lower > 0x9) lower += 6;
+
+        uint8_t upper = (uint8_t)(data.first >> 4) + (cpu.A >> 4) + (lower > 0x0F);
+        if (upper > 0x9) upper += 6;
+       
+        uint8_t h1 = cpu.A >> 4;
+        uint8_t h2 = (uint8_t)data.first >> 4;
+        uint8_t s1 = (h1 & 0x8) ? h1 - 0x0F : h1;
+        uint8_t s2 = (h2 & 0x8) ? h2 - 0x0F : h2;
+        int8_t s = std::bit_cast<int8_t, uint8_t>(s1+s2);
+        
+        cpu.PS.N = cpu.PS.V = cpu.PS.Z = cpu.PS.C = 0;
+        cpu.PS.V = (s < -8 || s > 7);
+        cpu.PS.C = (upper > 0xF);
+        cpu.A = (upper << 4) | (lower & 0xF);
         cpu.PS.Z = (cpu.A == 0);
-        cpu.PS.N = (trimmed_result & 0x80) > 0;
-        cpu.PS.V = ((~((uint16_t)cpu.A ^ (uint16_t)data.first)) & ((uint16_t)cpu.A ^ (result)) & 0x80) > 0;
+        cpu.PS.N = (upper >> 3);
+        
     } else {
         uint16_t result = (uint16_t)cpu.A + (uint16_t)data.first + (uint16_t)cpu.PS.C;
         cpu.PS.C = result > 255;
@@ -67,28 +49,6 @@ static cycles instructions::ADC(Cpu& cpu){
         cpu.PS.V = ((~((uint16_t)cpu.A ^ (uint16_t)data.first)) & ((uint16_t)cpu.A ^ (result)) & 0x80) > 0;
         cpu.A = (uint8_t)(result & 0xFF);
     }
-
-    
-    // uint8_t number;
-    // uint16_t result;
-    // if (cpu.PS.D){ // BCD
-    //     number = conv_to_int(data.first);
-    //     result = (uint16_t)cpu.A + number + cpu.PS.C;
-    //     if (result & 0x0080){
-    //         cpu.A = conv_to_bcd((~result + 1) % 100); // 2's complement
-    //     } else {
-    //         cpu.A = conv_to_bcd(result % 100);
-    //     }
-    // } else { // Normal
-    //     number = data.first;
-    //     result = (uint16_t)cpu.A + number + cpu.PS.C;
-    //     cpu.A = result;
-    // }
-
-    // cpu.PS.C = result & 0x0100;
-    // if ((cpu.A & 0x80) ^ (cpu.PS.N << 7)) cpu.PS.V = 1;
-    // CHECK_Z_FLAG(cpu.A);
-    // CHECK_N_FLAG(cpu.A);
 
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(mode) && data.second ? cyc + 1 : cyc;
 }
@@ -402,26 +362,31 @@ static cycles instructions::SBC(Cpu& cpu){
     constexpr cycles cyc = get_cycles<Mode>({IMMEDIATE, ZERO_PAGE, ZERO_PAGE_XY, ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_X, INDIRECT_Y},
                                             {2,3,4,4,4,4,6,5});
     auto data = load_addr<Mode, NORMAL_MODE>(cpu);
-    uint8_t number;
-    uint8_t result;
-    if (cpu.PS.D){ // BCD
-        number = ~conv_to_int(data.first) + 1; // 2's complement
-        result = cpu.A + number - !cpu.PS.C;
-        if (result & 0x0080) {
-            cpu.A = conv_to_bcd((~result + 1) % 100);
-            cpu.PS.C = 0;
-        } else {
-            cpu.A = conv_to_bcd(result % 100);
-        }
-    } else { // Normal
-        number = ~data.first + 1; // 2's complement
-        result = cpu.A + number - !cpu.PS.C;
-        cpu.A = result;
-    }
 
-    if ((cpu.A & 0x80) ^ (cpu.PS.N << 7)) cpu.PS.V = 1;
-    CHECK_Z_FLAG(cpu.A);
-    CHECK_N_FLAG(cpu.A);
+    if (cpu.PS.D) { // BCD
+        uint16_t result = cpu.A - data.first - !cpu.PS.C;
+        // split upper and lower into separate bytes for calculation.
+        uint8_t lower = (cpu.A & 0x0F) - (data.first & 0x0F) - !cpu.PS.C;
+        if (lower & 0x80) lower -= 6; // 0x80 - 0x6 = 0xA (make lower digit wrap between 0x0 and 0x9)
+
+        uint8_t upper = (cpu.A >> 4) - (data.first >> 4) - (lower >> 7); // subtract 1 if lower digit overflowed
+        if (upper & 0x80) upper -=6; // 0x80 - 0x6 = 0xA (make lower digit wrap between 0x0 and 0x9)
+
+        cpu.PS.N = cpu.PS.V = cpu.PS.Z = cpu.PS.C = 0;
+        cpu.PS.V = (((uint16_t)cpu.A ^ data.first) & ((uint16_t)cpu.A ^ result) & 0x80) > 0;
+        cpu.PS.C = ((result & 0xFF00) == 0);
+        cpu.A = (upper << 4) | (lower & 0xF);
+        cpu.PS.Z = (cpu.A == 0);
+        cpu.PS.N = (upper >> 7);
+
+    } else {
+        uint16_t result = (uint16_t)cpu.A + ((uint16_t)(data.first) ^ 0x00FF) + (uint16_t)cpu.PS.C;
+        cpu.PS.C = result > 0xFF;
+        cpu.PS.N = (result & 0x80) > 0;
+        cpu.PS.Z = (result & 0xFF) == 0;
+        cpu.PS.V = ((~((uint16_t)cpu.A ^ (uint16_t)(~data.first))) & ((uint16_t)cpu.A ^ (result)) & 0x80) > 0;
+        cpu.A = (uint8_t)(result & 0xFF);
+    }
 
     return contains_modes<ABSOLUTE_X, ABSOLUTE_Y, INDIRECT_Y>(Mode) && data.second ? cyc + 1 : cyc;
 }
